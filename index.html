@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brawl Stars Draft Assistant - Mode Stratège V5</title>
+    <title>Brawl Stars Draft Assistant - Mode Stratège V6</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -37,7 +37,12 @@
         .controls { display: flex; gap: 10px; }
         button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; }
         .btn-reset { background: var(--col-ban); color: white; }
-        .btn-undo { background: #444; color: white; } /* Bouton EFFACER */
+        .btn-undo { background: #444; color: white; }
+        
+        /* Bouton First Pick */
+        #btn-fp { transition: 0.3s; color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .fp-ally { background: var(--pick-ally); box-shadow: 0 0 10px rgba(0, 153, 255, 0.4); }
+        .fp-enemy { background: var(--pick-enemy); box-shadow: 0 0 10px rgba(255, 153, 0, 0.4); }
 
         /* LÉGENDE */
         .legend { font-size: 11px; display: flex; gap: 15px; color: #aaa; align-items: center; }
@@ -66,8 +71,8 @@
         .pick-slot img { width: 100%; height: 100%; object-fit: cover; }
         .pick-slot span { position: absolute; bottom: 4px; background: rgba(0,0,0,0.8); padding: 2px 6px; font-size: 11px; border-radius: 4px; pointer-events: none; }
         
-        .pick-slot.enemy.active { border-color: var(--pick-enemy); box-shadow: 0 0 10px var(--pick-enemy); }
-        .pick-slot.ally.active { border-color: var(--pick-ally); box-shadow: 0 0 10px var(--pick-ally); }
+        .pick-slot.enemy.active { border-color: var(--pick-enemy); box-shadow: 0 0 15px var(--pick-enemy); transform: scale(1.02); }
+        .pick-slot.ally.active { border-color: var(--pick-ally); box-shadow: 0 0 15px var(--pick-ally); transform: scale(1.02); }
 
         /* GRILLE */
         .grid-container {
@@ -151,7 +156,8 @@
     <div class="top-bar">
         <div class="controls">
             <button class="btn-reset" onclick="resetDraft()">RESET</button>
-            <button class="btn-undo" onclick="clearCurrentSlot()">CLEAR</button>
+            <button class="btn-undo" onclick="clearCurrentSlot()">EFFACER</button>
+            <button id="btn-fp" class="fp-ally" onclick="toggleFirstPick()">1st PICK: MOI</button>
         </div>
         
         <div class="legend">
@@ -325,7 +331,13 @@
         const allBrawlers = Array.from(allBrawlersSet).sort();
         
         // --- STATE ---
-        let state = { ban: [null,null,null,null,null,null], enemy: [null,null,null], ally: [null,null,null], activeSlot: {type:null,index:null} };
+        let state = { 
+            ban: [null,null,null,null,null,null], 
+            enemy: [null,null,null], 
+            ally: [null,null,null], 
+            activeSlot: {type:null,index:null},
+            firstPick: 'ally' // 'ally' ou 'enemy'
+        };
 
         // --- LOGIQUE METIER ---
         // Qui contre "brawlerName" ? (Weaknesses)
@@ -356,7 +368,21 @@
         function selectSlot(element, type, index) {
             document.querySelectorAll('.ban-slot, .pick-slot').forEach(el => el.classList.remove('active'));
             state.activeSlot = { type, index };
-            element.classList.add('active');
+            if(element) element.classList.add('active');
+        }
+
+        function toggleFirstPick() {
+            const btn = document.getElementById('btn-fp');
+            if (state.firstPick === 'ally') {
+                state.firstPick = 'enemy';
+                btn.className = 'fp-enemy';
+                btn.innerText = '1st PICK: ADV';
+            } else {
+                state.firstPick = 'ally';
+                btn.className = 'fp-ally';
+                btn.innerText = '1st PICK: MOI';
+            }
+            // Si on est en phase de draft (pas de bans), recalculer l'affichage peut être utile, mais ici surtout pour la suite
         }
 
         function handleBrawlerClick(brawlerName) {
@@ -364,9 +390,7 @@
             
             const { type, index } = state.activeSlot;
             
-            // Empêcher de re-sélectionner un brawler déjà pris (sauf pour les bans qui peuvent être doublons si besoin, mais ici on limite généralement)
-            // Dans votre règle : Bans = doublons OK, Picks = sans doublons.
-            // On vérifie donc seulement si c'est un pick et que le brawler est déjà ailleurs.
+            // Verif doublon (sauf bans)
             if (type !== 'ban' && isPickedOrBanned(brawlerName)) {
                 if (state[type][index] !== brawlerName) return; 
             }
@@ -375,12 +399,58 @@
             updateSlotUI(type, index, brawlerName);
             updateGridState();
 
-            // --- AUTO ADVANCE POUR LES BANS ---
-            // Si on est sur un ban et qu'on n'est pas au dernier (index 5)
-            if (type === 'ban' && index < 5) {
-                const nextIndex = index + 1;
-                const nextSlot = document.querySelectorAll('.ban-slot')[nextIndex];
-                selectSlot(nextSlot, 'ban', nextIndex);
+            // --- AUTO ADVANCE LOGIQUE ---
+            advanceToNextSlot(type, index);
+        }
+
+        function advanceToNextSlot(currentType, currentIndex) {
+            // 1. PHASE DE BANS
+            if (currentType === 'ban') {
+                if (currentIndex < 5) {
+                    // Ban suivant
+                    selectSlot(document.querySelectorAll('.ban-slot')[currentIndex + 1], 'ban', currentIndex + 1);
+                } else {
+                    // Fin des bans -> Aller au 1er Pick
+                    // Le 1er pick est toujours l'index 0 de l'équipe "First Pick"
+                    const fpTeam = state.firstPick; // 'ally' ou 'enemy'
+                    const panelIndex = (fpTeam === 'enemy') ? 0 : 1;
+                    const slot = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[0];
+                    selectSlot(slot, fpTeam, 0);
+                }
+                return;
+            }
+
+            // 2. PHASE DE PICKS (SNAKE DRAFT)
+            // Ordre : A1 -> B1 -> B2 -> A2 -> A3 -> B3
+            // A = First Pick Team, B = Second Pick Team
+            const A = state.firstPick;
+            const B = (A === 'ally') ? 'enemy' : 'ally';
+
+            // Définition de la séquence exacte
+            const sequence = [
+                { type: A, index: 0 }, // Pick 1
+                { type: B, index: 0 }, // Pick 2
+                { type: B, index: 1 }, // Pick 3
+                { type: A, index: 1 }, // Pick 4
+                { type: A, index: 2 }, // Pick 5
+                { type: B, index: 2 }  // Pick 6 (Dernier)
+            ];
+
+            // Trouver l'étape actuelle dans la séquence
+            let currentStepIndex = -1;
+            for (let i = 0; i < sequence.length; i++) {
+                if (sequence[i].type === currentType && sequence[i].index === currentIndex) {
+                    currentStepIndex = i;
+                    break;
+                }
+            }
+
+            // Aller à l'étape suivante si elle existe
+            if (currentStepIndex !== -1 && currentStepIndex < sequence.length - 1) {
+                const nextStep = sequence[currentStepIndex + 1];
+                const panelIndex = (nextStep.type === 'enemy') ? 0 : 1;
+                const slot = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[nextStep.index];
+                selectSlot(slot, nextStep.type, nextStep.index);
             }
         }
 
@@ -495,7 +565,6 @@
             });
         }
 
-        // --- NOUVELLE FONCTION : EFFACER ---
         function clearCurrentSlot() {
             const { type, index } = state.activeSlot;
             if (!type) return;
@@ -532,6 +601,13 @@
                 const idx = Array.from(el.parentNode.children).indexOf(el) - 1; 
                 el.innerHTML = `<span>Pick ${idx + 1}</span>`;
             });
+            
+            // Reset First Pick button visual (but keep the value or reset to ally ? let's keep 'ally' default)
+            state.firstPick = 'ally';
+            const btn = document.getElementById('btn-fp');
+            btn.className = 'fp-ally';
+            btn.innerText = '1st PICK: MOI';
+
             updateGridState();
 
             // Resélectionner automatiquement le premier ban
