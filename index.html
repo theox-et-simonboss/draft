@@ -533,15 +533,50 @@
         }
 
         function toggleFirstPick() {
+            // 1. Toggle State
+            state.firstPick = (state.firstPick === 'ally') ? 'enemy' : 'ally';
+
+            // 2. Update Button UI
             const btn = document.getElementById('btn-fp');
             if (state.firstPick === 'ally') {
-                state.firstPick = 'enemy';
-                btn.className = 'fp-enemy';
-                btn.innerText = '1ˢᵗ pick : Them';
-            } else {
-                state.firstPick = 'ally';
                 btn.className = 'fp-ally';
                 btn.innerText = '1ˢᵗ pick : Me';
+            } else {
+                btn.className = 'fp-enemy';
+                btn.innerText = '1ˢᵗ pick : Them';
+            }
+
+            // 3. LOGIC FIX: Re-calculate Active Slot if we are in Pick Phase
+            if (state.activeSlot.type !== 'ban') {
+                // Count current picks
+                const filledAlly = state.ally.filter(x => x !== null).length;
+                const filledEnemy = state.enemy.filter(x => x !== null).length;
+                const totalPicks = filledAlly + filledEnemy;
+
+                if (totalPicks < 6) {
+                    // Determine sequence based on NEW first pick
+                    const A = state.firstPick;
+                    const B = (A === 'ally') ? 'enemy' : 'ally';
+
+                    // Standard Draft Sequence: A, B, B, A, A, B
+                    const sequence = [
+                        { type: A, index: 0 },
+                        { type: B, index: 0 },
+                        { type: B, index: 1 },
+                        { type: A, index: 1 },
+                        { type: A, index: 2 },
+                        { type: B, index: 2 }
+                    ];
+
+                    const nextStep = sequence[totalPicks];
+                    
+                    // Force select the correct slot
+                    const panelIndex = (nextStep.type === 'enemy') ? 0 : 1;
+                    const slotToSelect = document.querySelectorAll('.team-panel')[panelIndex]
+                                                .querySelectorAll('.pick-slot')[nextStep.index];
+                    
+                    selectSlot(slotToSelect, nextStep.type, nextStep.index);
+                }
             }
         }
 
