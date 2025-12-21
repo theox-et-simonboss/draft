@@ -152,7 +152,7 @@
     <div class="top-bar">
         <div class="controls">
             <button class="btn-reset" onclick="resetDraft()">RESET</button>
-            <button class="btn-undo" onclick="undoLast()">UNDO</button>
+            <button class="btn-undo" onclick="clearCurrentSlot()">EFFACER</button>
         </div>
         
         <div class="legend">
@@ -496,16 +496,29 @@
             if (state.history.length > 10) state.history.shift();
         }
 
-        function undoLast() {
-            if (state.history.length === 0) return;
-            const prev = state.history.pop();
-            state.ban = prev.ban; state.enemy = prev.enemy; state.ally = prev.ally;
-            
-            state.ban.forEach((b, i) => b ? updateSlotUI('ban', i, b) : clearSlot('ban', i));
-            state.enemy.forEach((b, i) => b ? updateSlotUI('enemy', i, b) : clearSlot('enemy', i));
-            state.ally.forEach((b, i) => b ? updateSlotUI('ally', i, b) : clearSlot('ally', i));
-            updateGridState();
-        }
+        // Remplace la fonction undoLast()
+        function clearCurrentSlot() {
+    // Récupérer le type (ban, enemy, ally) et l'index de la case sélectionnée (en jaune/bleu/orange)
+            const { type, index } = state.activeSlot;
+
+    // Si aucune case n'est sélectionnée, on ne fait rien (ou on prévient)
+            if (!type) {
+        // Optionnel : alert("Veuillez sélectionner une case à vider.");
+                return;
+            }
+
+    // 1. Mettre à jour les données (State)
+    // On remet la valeur à null dans le tableau correspondant
+    state[type][index] = null;
+
+    // 2. Mettre à jour l'interface (UI)
+    // On utilise votre fonction existante clearSlot qui gère déjà l'affichage (retire l'image, remet le texte "Pick X")
+    clearSlot(type, index);
+
+    // 3. Recalculer les suggestions
+    // Comme un brawler a été retiré, les scores et les contres doivent être mis à jour
+    updateGridState();
+}
 
         function clearSlot(type, index) {
              if (type === 'ban') {
@@ -538,3 +551,4 @@
     </script>
 </body>
 </html>
+
