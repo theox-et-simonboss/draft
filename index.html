@@ -200,7 +200,7 @@
         
         /* RECTANGLE MODE (ACTIVE) */
         .brawler-card.expanded {
-            height: 145px;
+            height: 110px; /* Reduced from 145px for compactness */
             justify-content: flex-start;
             background: #252e3d;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -212,7 +212,7 @@
             width: 100%; height: auto; max-height: 60px; object-fit: contain; 
             margin-top: 0; transition: max-height 0.2s;
         }
-        .brawler-card.expanded > img { max-height: 70px; margin-top: 4px; }
+        .brawler-card.expanded > img { max-height: 60px; margin-top: 2px; }
         
         .brawler-card .name { 
             font-size: 11px; font-weight: 600; text-align: center; 
@@ -238,13 +238,26 @@
 
         /* MINI ICONS */
         .interactions-container { 
-            width: 100%; display: none; /* Hidden for squares */
-            flex-direction: column; gap: 4px; margin-top: auto; 
-            padding-bottom: 2px; pointer-events: none; flex-shrink: 0;
+            width: 100%; 
+            display: none; 
+            flex-direction: row; /* Horizontal layout */
+            justify-content: space-between; /* One group on Left, one on Right */
+            align-items: flex-end; /* Bottom align */
+            margin-top: auto; 
+            padding: 0 4px; /* Slight padding from edges */
+            padding-bottom: 2px; 
+            pointer-events: none; 
+            flex-shrink: 0;
+            box-sizing: border-box;
         }
-        .brawler-card.expanded .interactions-container { display: flex; } /* Visible for rectangles */
+        .brawler-card.expanded .interactions-container { display: flex; }
 
-        .mini-icon-group { display: flex; justify-content: center; gap: 2px; height: 24px; }
+        .mini-icon-group { display: flex; gap: 2px; height: 24px; }
+        /* Victims (Left) */
+        .group-victims { justify-content: flex-start; }
+        /* Killers (Right) */
+        .group-killers { justify-content: flex-end; }
+
         .mini-icon { 
             width: 24px; height: 24px; object-fit: cover; border-radius: 50%; 
             border: 1px solid var(--card-bg); background: #000; 
