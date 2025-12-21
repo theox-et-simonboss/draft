@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brawl Stars Draft Assistant - V7 Sécurité</title>
+    <title>Brawl Stars Draft Assistant - V10 Tri Avancé</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -12,12 +12,12 @@
             --pick-ally: #0099ff;
             --text-color: #ffffff;
             
-            /* COULEURS ETATS (Priorité Visuelle) */
-            --col-fatal: #a000c0; /* Violet (2+ morts) -> MORTEL */
-            --col-bad: #ff3333;   /* Rouge Vif (1 mort) -> DANGER */
-            --col-ideal: #ffd700; /* Or (2+ kills, 0 mort) -> IDEAL */
-            --col-good: #00ff88;  /* Vert (1 kill, 0 mort) -> BON */
-            --col-warn: #ffff00;  /* Jaune (Synergie) */
+            /* COULEURS ETATS */
+            --col-ideal: #ffd700; /* Or (Dominant) */
+            --col-good: #00ff88;  /* Vert (Positif) */
+            --col-mixed: #3399ff; /* Bleu (Neutre/Trade) */
+            --col-bad: #ff3333;   /* Rouge (Négatif) */
+            --col-fatal: #a000c0; /* Violet (Mortel) */
             --col-ban: #ff4444;   /* Rouge pâle (Banni) */
         }
 
@@ -40,7 +40,6 @@
         .btn-reset { background: var(--col-ban); color: white; }
         .btn-undo { background: #444; color: white; }
         
-        /* Bouton First Pick */
         #btn-fp { transition: 0.3s; color: white; border: 1px solid rgba(255,255,255,0.2); }
         .fp-ally { background: var(--pick-ally); box-shadow: 0 0 10px rgba(0, 153, 255, 0.4); }
         .fp-enemy { background: var(--pick-enemy); box-shadow: 0 0 10px rgba(255, 153, 0, 0.4); }
@@ -59,11 +58,10 @@
         .ban-slot img { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; filter: grayscale(100%); }
         .ban-icon-overlay { position: absolute; font-size: 24px; color: var(--col-ban); font-weight: bold; pointer-events: none; }
 
-        /* ZONES PRINCIPALES */
+        /* ZONES */
         .draft-area { display: flex; flex: 1; gap: 15px; overflow: hidden; }
         .team-panel { width: 140px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
         
-        /* SLOTS DE PICK */
         .pick-slot {
             height: 90px; background: var(--panel-bg); border: 2px solid #444; border-radius: 10px;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -85,61 +83,82 @@
             margin-bottom: 10px; border-radius: 6px; font-size: 14px; box-sizing: border-box;
         }
         .brawlers-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap: 8px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 8px;
             overflow-y: auto; padding-right: 5px;
         }
 
-        /* CARTES BRAWLERS */
+        /* CARTES */
         .brawler-card {
             background: #2a2a2a; border-radius: 8px; cursor: pointer;
             display: flex; flex-direction: column; align-items: center; padding: 6px;
-            border: 2px solid transparent; position: relative; height: 100px;
+            border: 2px solid transparent; position: relative; height: 115px;
             transition: transform 0.1s;
         }
         .brawler-card:hover { transform: scale(1.05); z-index: 10; background: #333; }
-        .brawler-card img { width: 60px; height: 60px; object-fit: contain; border-radius: 4px; }
-        .brawler-card .name { font-size: 10px; text-align: center; margin-top: 5px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+        .brawler-card > img { width: 60px; height: 60px; object-fit: contain; border-radius: 4px; margin-bottom: 28px; }
+        .brawler-card .name { font-size: 10px; text-align: center; position: absolute; bottom: 5px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
         .img-error-text { font-size: 8px; color: #ff6b6b; margin-top: 2px; text-align: center; line-height: 1; }
 
-        /* ÉTATS SPECIAUX (CSS) */
+        /* --- LOGIQUE DE TRI VISUEL (CSS Order) --- */
         
-        /* Désactivé (Pris ou Banni) */
+        /* 1. IDEAL (Or) : Score net >= 2, 0 menace */
+        .brawler-card.status-ideal { 
+            border-color: var(--col-ideal); background: rgba(255, 215, 0, 0.15); 
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); order: -10; 
+        }
+        
+        /* 2. GOOD SAFE (Vert) : Score net > 0, 0 menace */
+        .brawler-card.status-good { 
+            border-color: var(--col-good); background: rgba(0, 255, 136, 0.1); 
+            order: -5; 
+        }
+
+        /* 3. GOOD RISKY (Vert) : Score net > 0, MAIS avec menaces */
+        /* C'est ton cas "contre 2, contré par 1". Il reste vert mais descend dans la liste */
+        .brawler-card.status-good-risky { 
+            border-color: var(--col-good); background: rgba(0, 255, 136, 0.1); 
+            /* Ajout d'un petit effet visuel pour signaler le risque si tu veux, sinon juste vert */
+            border-style: dashed; 
+            order: -3; 
+        }
+
+        /* 4. MIXED (Bleu) : Score net = 0 (Trade) */
+        .brawler-card.status-mixed { 
+            border-color: var(--col-mixed); background: rgba(51, 153, 255, 0.15); 
+            order: -1; 
+        }
+
+        /* 5. BAD (Rouge) : Score net < 0 (-1) */
+        .brawler-card.status-bad { 
+            border-color: var(--col-bad); background: rgba(255, 51, 51, 0.15); 
+            opacity: 0.9; order: 10;
+        }
+
+        /* 6. FATAL (Violet) : Score net très bas (<= -2) */
+        .brawler-card.status-fatal { 
+            border-color: var(--col-fatal); background: rgba(160, 0, 192, 0.2); 
+            opacity: 0.7; order: 20;
+        }
+        
+        /* Disabled */
         .brawler-card.disabled { opacity: 0.2; filter: grayscale(100%); pointer-events: none; order: 999; }
         .brawler-card.banned::after { content: 'X'; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: red; font-weight: bold; text-shadow: 0 0 5px black; }
 
-        /* PRIORITÉ D'AFFICHAGE CSS (Flex Order) - Plus le chiffre est petit, plus c'est haut */
-        /* Ideal: -5, Good: -4, Fatal: 10, Bad: 5 */
+        /* MINI ICONES */
+        .interactions-container {
+            position: absolute; top: 62px; width: 100%; display: flex; justify-content: space-between; padding: 0 4px; box-sizing: border-box; pointer-events: none;
+        }
+        .mini-icon-group { display: flex; gap: -2px; /* Chevauchement léger pour gagner de la place */ }
         
-        .brawler-card.status-ideal { 
-            border-color: var(--col-ideal); background: rgba(255, 215, 0, 0.15); 
-            box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); order: -5; 
+        .mini-icon {
+            width: 24px; height: 24px; object-fit: cover; border-radius: 50%;
+            border: 1px solid white; background: #000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            z-index: 2; /* Pour le chevauchement */
         }
         
-        .brawler-card.status-good { 
-            border-color: var(--col-good); background: rgba(0, 255, 136, 0.1); order: -4; 
-        }
-
-        /* Les mauvais choix restent visibles mais marqués */
-        .brawler-card.status-bad { 
-            border-color: var(--col-bad); background: rgba(255, 51, 51, 0.15); 
-            opacity: 0.9; order: 5;
-        }
-
-        .brawler-card.status-fatal { 
-            border-color: var(--col-fatal); background: rgba(160, 0, 192, 0.2); 
-            opacity: 0.7; order: 10;
-        }
-
-        /* BADGES */
-        .badge { position: absolute; font-weight: bold; z-index: 5; box-shadow: 0 2px 2px black; display: flex; justify-content: center; align-items: center; }
-        
-        .badge-score { top: -4px; right: -4px; background: var(--col-ideal); color: black; font-size: 9px; padding: 2px 5px; border-radius: 8px; }
-        
-        .badge-bad { top: -4px; right: -4px; background: var(--col-bad); color: white; font-size: 14px; width: 18px; height: 18px; border-radius: 50%; }
-        
-        .badge-fatal { top: -4px; right: -4px; background: var(--col-fatal); color: white; font-size: 10px; padding: 2px 5px; border-radius: 4px; }
-        
-        .badge-warn { top: -4px; left: -4px; background: var(--col-warn); color: black; font-size: 12px; width: 16px; height: 16px; border-radius: 50%; }
+        .mini-icon.victim { border-color: var(--col-good); }
+        .mini-icon.killer { border-color: var(--col-bad); }
 
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #1e1e1e; }
@@ -151,15 +170,17 @@
     <div class="top-bar">
         <div class="controls">
             <button class="btn-reset" onclick="resetDraft()">RESET</button>
-            <button class="btn-undo" onclick="clearCurrentSlot()">CLEAR</button>
+            <button class="btn-undo" onclick="clearCurrentSlot()">EFFACER</button>
             <button id="btn-fp" class="fp-ally" onclick="toggleFirstPick()">1st PICK: MOI</button>
         </div>
         
         <div class="legend">
-            <span><div class="dot" style="background:var(--col-ideal)"></div>Idéal (Safe)</span>
-            <span><div class="dot" style="background:var(--col-good)"></div>Bon (Safe)</span>
-            <span><div class="dot" style="background:var(--col-bad)"></div>⛔ Risqué (1 contre)</span>
-            <span><div class="dot" style="background:var(--col-fatal)"></div>💀 MORTEL (2+ contres)</span>
+            <span><div class="dot" style="background:var(--col-ideal)"></div>Idéal</span>
+            <span><div class="dot" style="background:var(--col-good)"></div>Sûr</span>
+            <span style="border-bottom: 1px dashed var(--col-good)">Risqué (Vert)</span>
+            <span><div class="dot" style="background:var(--col-mixed)"></div>Mitigé</span>
+            <span><div class="dot" style="background:var(--col-bad)"></div>Négatif</span>
+            <span><div class="dot" style="background:var(--col-fatal)"></div>Mortel</span>
         </div>
 
         <div class="bans-container">
@@ -194,7 +215,7 @@
     </div>
 
     <script>
-        // --- DONNEES (Jane supprimé) ---
+        // --- DONNEES ---
         const rawData = {
             "8-BIT": ["Belle", "Squeak", "Penny", "Barley", "Sprout", "Bo", "Mina"],
             "ALLI": ["Doug", "Trunk", "Bull", "R-T", "Jacky"],
@@ -335,7 +356,6 @@
         };
 
         // --- LOGIQUE METIER ---
-        // Qui contre "brawlerName" ? (Weaknesses)
         function getWeaknessesOf(brawlerName) {
             return counterData[brawlerName] || [];
         }
@@ -354,6 +374,10 @@
                 div.innerHTML = `
                     <img src="icons/${fileName}" onerror="this.onerror=null; this.src='https://via.placeholder.com/60?text=?'; this.parentElement.querySelector('.img-error-text').innerText = 'Manque: ${fileName}';">
                     <div class="name">${brawler}</div>
+                    <div class="interactions-container">
+                        <div class="mini-icon-group group-victims"></div>
+                        <div class="mini-icon-group group-killers"></div>
+                    </div>
                     <div class="img-error-text"></div>
                 `;
                 gridElement.appendChild(div);
@@ -449,20 +473,19 @@
             const activeEnemies = state.enemy.filter(e => e);
             const activeAllies = state.ally.filter(a => a);
 
-            let teamWeaknesses = new Set();
-            activeAllies.forEach(ally => {
-                getWeaknessesOf(ally).forEach(w => teamWeaknesses.add(w));
-            });
-
             allBrawlers.forEach(brawler => {
                 const safeId = brawler.replace(/[\s.]/g, '-');
                 const card = document.getElementById(`card-${safeId}`);
                 if (!card) return;
                 
+                // Reset complet
                 card.className = 'brawler-card';
-                const badges = card.querySelectorAll('.badge, .badge-score, .badge-fatal, .badge-warn, .badge-bad');
-                badges.forEach(b => b.remove());
+                const victimsContainer = card.querySelector('.group-victims');
+                const killersContainer = card.querySelector('.group-killers');
+                victimsContainer.innerHTML = '';
+                killersContainer.innerHTML = '';
 
+                // 1. Disable
                 if (state.ban.includes(brawler)) {
                     card.classList.add('disabled', 'banned');
                     return;
@@ -471,63 +494,64 @@
                     return;
                 }
 
-                // --- LOGIQUE V7 (Sécurité) ---
+                // 2. ANALYSE INTERACTIONS
+                let victims = []; // Ennemis que je tue
+                let killers = []; // Ennemis qui me tuent
+
+                activeEnemies.forEach(enemy => {
+                    // Est-ce que 'enemy' est une victime de 'brawler' ?
+                    if (getWeaknessesOf(enemy).includes(brawler)) {
+                        victims.push(enemy);
+                    }
+                    // Est-ce que 'enemy' est un tueur de 'brawler' ?
+                    if (getWeaknessesOf(brawler).includes(enemy)) {
+                        killers.push(enemy);
+                    }
+                });
+
+                // 3. GENERATION MINI ICONES
+                victims.forEach(vName => {
+                    const img = document.createElement('img');
+                    img.src = "icons/" + getFileName(vName);
+                    img.className = "mini-icon victim";
+                    victimsContainer.appendChild(img);
+                });
+                killers.forEach(kName => {
+                    const img = document.createElement('img');
+                    img.src = "icons/" + getFileName(kName);
+                    img.className = "mini-icon killer";
+                    killersContainer.appendChild(img);
+                });
+
+                // 4. SCORE NET et CLASSIFICATION
+                const scoreNet = victims.length - killers.length;
+                const threats = killers.length;
                 
-                // 1. Défense : Combien d'ennemis actifs me battent ?
-                let threats = 0;
-                activeEnemies.forEach(enemy => {
-                    // Si un ennemi actif est dans la liste des faiblesses du brawler
-                    if (getWeaknessesOf(brawler).includes(enemy)) threats++;
-                });
-
-                // 2. Attaque : Combien d'ennemis je bats ?
-                let score = 0;
-                activeEnemies.forEach(enemy => {
-                    // Si je suis dans la liste des faiblesses de l'ennemi
-                    if (getWeaknessesOf(enemy).includes(brawler)) score++;
-                });
-
-                // 3. Synergie
-                let isWarn = false;
-                if (activeAllies.length > 0) {
-                    const myWeaknesses = getWeaknessesOf(brawler);
-                    if (myWeaknesses.some(w => teamWeaknesses.has(w))) isWarn = true;
-                }
-
-                // 4. APPLICATION VISUELLE
-                if (threats >= 2) {
-                    // MORTEL (2+ ennemis me tuent)
-                    card.classList.add('status-fatal');
-                    addBadge(card, 'badge-fatal', '💀 x' + threats);
-                } 
-                else if (threats === 1) {
-                    // CRITIQUE (1 ennemi me tue) -> ROUGE
-                    card.classList.add('status-bad');
-                    addBadge(card, 'badge-bad', '⛔');
-                } 
-                else {
-                    // SAFE (0 menace) -> On regarde les opportunités
-                    if (score >= 2) {
-                        card.classList.add('status-ideal');
-                        addBadge(card, 'badge-score', '★ x' + score);
-                    } 
-                    else if (score === 1) {
-                        card.classList.add('status-good');
+                // Si aucune menace, logique classique Or/Vert
+                if (threats === 0) {
+                    if (scoreNet >= 2) {
+                        card.classList.add('status-ideal'); // Or
+                    } else if (scoreNet > 0) {
+                        card.classList.add('status-good');  // Vert Sûr
                     }
                 }
-
-                // Warning Synergie
-                if (isWarn && threats === 0) {
-                    addBadge(card, 'badge-warn', '⚠');
+                // Si menaces, logique de risque
+                else {
+                    if (scoreNet > 0) {
+                        // Positif mais risqué (ex: tue 2, meurt par 1) -> Vert Risqué
+                        card.classList.add('status-good-risky');
+                    }
+                    else if (scoreNet === 0) {
+                        card.classList.add('status-mixed'); // Bleu
+                    }
+                    else if (scoreNet === -1) {
+                        card.classList.add('status-bad');   // Rouge
+                    }
+                    else {
+                        card.classList.add('status-fatal'); // Violet
+                    }
                 }
             });
-        }
-
-        function addBadge(card, className, text) {
-            const div = document.createElement('div');
-            div.className = className + ' badge';
-            div.innerText = text;
-            card.appendChild(div);
         }
 
         function filterGrid() {
