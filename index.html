@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brawl Stars Draft Assistant - V10 Tri Avancé</title>
+    <title>Brawl Stars Draft Assistant - V12 (Perfect & Suicide)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -13,11 +13,13 @@
             --text-color: #ffffff;
             
             /* COULEURS ETATS */
+            --col-perfect: #00ffff; /* Cyan Électrique */
             --col-ideal: #ffd700;
             --col-good: #00ff88;
             --col-mixed: #3399ff;
             --col-bad: #ff3333;
             --col-fatal: #a000c0;
+            --col-worst: #777777;   /* Rouge Sang pour le "Suicide" */
             --col-ban: #ff4444;
         }
 
@@ -94,12 +96,30 @@
         .brawler-card .name { font-size: 10px; text-align: center; position: absolute; bottom: 5px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
         .img-error-text { font-size: 8px; color: #ff6b6b; margin-top: 2px; text-align: center; line-height: 1; }
 
+        /* CLASSIFICATION DES ETATS */
+        .brawler-card.status-perfect { 
+            border-color: var(--col-perfect); 
+            background: rgba(0, 255, 255, 0.25); 
+            box-shadow: 0 0 20px var(--col-perfect); 
+            order: -20; 
+        }
         .brawler-card.status-ideal { border-color: var(--col-ideal); background: rgba(255, 215, 0, 0.15); box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); order: -10; }
         .brawler-card.status-good { border-color: var(--col-good); background: rgba(0, 255, 136, 0.1); order: -5; }
         .brawler-card.status-good-risky { border-color: var(--col-good); background: rgba(0, 255, 136, 0.1); border-style: dashed; order: -3; }
         .brawler-card.status-mixed { border-color: var(--col-mixed); background: rgba(51, 153, 255, 0.15); order: -1; }
         .brawler-card.status-bad { border-color: var(--col-bad); background: rgba(255, 51, 51, 0.15); opacity: 0.9; order: 10; }
         .brawler-card.status-fatal { border-color: var(--col-fatal); background: rgba(160, 0, 192, 0.2); opacity: 0.7; order: 20; }
+        
+        /* NOUVEL ETAT : SUICIDE / CATASTROPHIQUE */
+        .brawler-card.status-worst { 
+            border-color: var(--col-worst); 
+            background: rgba(0, 0, 0, 0.9); /* Fond très sombre */
+            box-shadow: inset 0 0 15px #000000; 
+            opacity: 0.6; 
+            order: 30;
+            filter: grayscale(100%); /* Optionnel : rend l'image en noir et blanc pour accentuer l'effet */ 
+        }
+        
         .brawler-card.disabled { opacity: 0.2; filter: grayscale(100%); pointer-events: none; order: 999; }
         .brawler-card.banned::after { content: 'X'; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: red; font-weight: bold; text-shadow: 0 0 5px black; }
 
@@ -114,65 +134,16 @@
         ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
 
         /* --- GESTION MOBILE / TABLETTE --- */
-        #mobile-warning {
-            display: none; /* Caché par défaut sur PC */
-        }
+        #mobile-warning { display: none; }
 
-        /* Si la largeur de l'écran est inférieure à 1024px (Tablettes et Mobiles) */
         @media screen and (max-width: 1024px) {
-            /* On cache tout le contenu de l'app */
-            .top-bar, 
-            .draft-area {
-                display: none !important;
-            }
-            
-            /* On enlève le padding du body pour le full screen */
-            body {
-                padding: 0;
-                margin: 0;
-                justify-content: center;
-                align-items: center;
-            }
-
-            /* On affiche le message d'avertissement */
-            #mobile-warning {
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                text-align: center;
-                width: 100%;
-                height: 100%;
-                padding: 20px;
-                background: linear-gradient(135deg, #1e1e1e 0%, #121212 100%);
-            }
-
-            .warning-content {
-                background: #2a2a2a;
-                padding: 30px;
-                border-radius: 15px;
-                border: 1px solid #444;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                max-width: 400px;
-            }
-
-            .warning-icon {
-                font-size: 50px;
-                margin-bottom: 20px;
-            }
-
-            .warning-title {
-                font-size: 24px;
-                font-weight: bold;
-                color: var(--col-ban);
-                margin-bottom: 15px;
-            }
-
-            .warning-text {
-                font-size: 16px;
-                line-height: 1.5;
-                color: #ddd;
-            }
+            .top-bar, .draft-area { display: none !important; }
+            body { padding: 0; margin: 0; justify-content: center; align-items: center; }
+            #mobile-warning { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; width: 100%; height: 100%; padding: 20px; background: linear-gradient(135deg, #1e1e1e 0%, #121212 100%); }
+            .warning-content { background: #2a2a2a; padding: 30px; border-radius: 15px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: 400px; }
+            .warning-icon { font-size: 50px; margin-bottom: 20px; }
+            .warning-title { font-size: 24px; font-weight: bold; color: var(--col-ban); margin-bottom: 15px; }
+            .warning-text { font-size: 16px; line-height: 1.5; color: #ddd; }
         }
     </style>
 </head>
@@ -193,12 +164,14 @@
         </div>
         
         <div class="legend">
+            <span><div class="dot" style="background:var(--col-perfect)"></div>Parfait</span>
             <span><div class="dot" style="background:var(--col-ideal)"></div>Idéal</span>
             <span><div class="dot" style="background:var(--col-good)"></div>Sûr</span>
             <span style="border-bottom: 1px dashed var(--col-good)">Risqué (Vert)</span>
             <span><div class="dot" style="background:var(--col-mixed)"></div>Mitigé</span>
             <span><div class="dot" style="background:var(--col-bad)"></div>Négatif</span>
             <span><div class="dot" style="background:var(--col-fatal)"></div>Mortel</span>
+            <span><div class="dot" style="background:var(--col-worst)"></div>Suicide</span>
         </div>
 
         <div class="bans-container">
@@ -545,17 +518,24 @@
                 const scoreNet = victims.length - killers.length;
                 const threats = killers.length;
                 
-                // Si aucune menace, logique classique Or/Vert
+                // Si aucune menace, logique classique avec ajout du "Parfait"
                 if (threats === 0) {
-                    if (scoreNet >= 2) {
+                    if (victims.length === 3) {
+                        // CAS PRÉCIS : Contre les 3 adversaires
+                        card.classList.add('status-perfect'); 
+                    } else if (scoreNet >= 2) {
                         card.classList.add('status-ideal'); // Or
                     } else if (scoreNet > 0) {
                         card.classList.add('status-good');  // Vert Sûr
                     }
                 }
-                // Si menaces, logique de risque
+                // Si menaces, logique de risque + SUICIDE
                 else {
-                    if (scoreNet > 0) {
+                    if (threats === 3) {
+                        // CAS CATASTROPHIQUE : Contré par les 3 adversaires
+                        card.classList.add('status-worst');
+                    }
+                    else if (scoreNet > 0) {
                         // Positif mais risqué (ex: tue 2, meurt par 1) -> Vert Risqué
                         card.classList.add('status-good-risky');
                     }
