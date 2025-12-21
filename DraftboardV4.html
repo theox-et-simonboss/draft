@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brawl Stars Draft Assistant - Mode Stratège V4</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --pick-enemy: #ff9900;
+            --pick-ally: #0099ff;
+            --text-color: #ffffff;
+            
+            /* Couleurs Stratégiques */
+            --col-ideal: #ffd700; /* Or (x2) */
+            --col-good: #00ff88;  /* Vert (x1) */
+            --col-risk: #ff8800;  /* Orange (Trade) */
+            --col-crit: #ff0033;  /* Rouge Vif (Double Faiblesse) */
+            --col-ban: #ff4444;   /* Rouge pâle (Banni) */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* HEADER */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .controls { display: flex; gap: 10px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .btn-reset { background: var(--col-ban); color: white; }
+        .btn-undo { background: #444; color: white; }
+
+        /* LÉGENDE */
+        .legend { font-size: 11px; display: flex; gap: 15px; color: #aaa; align-items: center; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+
+        /* BANS */
+        .bans-container { display: flex; gap: 8px; background: var(--panel-bg); padding: 8px; border-radius: 8px; border: 1px solid #333; }
+        .ban-slot {
+            width: 50px; height: 50px; background: #333; border: 2px solid #555; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; cursor: pointer; overflow: hidden; position: relative;
+        }
+        .ban-slot.active { border-color: var(--col-ban); box-shadow: 0 0 8px var(--col-ban); }
+        .ban-slot img { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; filter: grayscale(100%); }
+        .ban-icon-overlay { position: absolute; font-size: 24px; color: var(--col-ban); font-weight: bold; pointer-events: none; }
+
+        /* ZONES PRINCIPALES */
+        .draft-area { display: flex; flex: 1; gap: 15px; overflow: hidden; }
+        .team-panel { width: 140px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+        
+        /* SLOTS DE PICK */
+        .pick-slot {
+            height: 90px; background: var(--panel-bg); border: 2px solid #444; border-radius: 10px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            cursor: pointer; position: relative; overflow: hidden; transition: 0.2s;
+        }
+        .pick-slot img { width: 100%; height: 100%; object-fit: cover; }
+        .pick-slot span { position: absolute; bottom: 4px; background: rgba(0,0,0,0.8); padding: 2px 6px; font-size: 11px; border-radius: 4px; pointer-events: none; }
+        
+        .pick-slot.enemy.active { border-color: var(--pick-enemy); box-shadow: 0 0 10px var(--pick-enemy); }
+        .pick-slot.ally.active { border-color: var(--pick-ally); box-shadow: 0 0 10px var(--pick-ally); }
+
+        /* GRILLE */
+        .grid-container {
+            flex: 1; background: var(--panel-bg); border-radius: 12px; padding: 15px;
+            display: flex; flex-direction: column; overflow: hidden; position: relative;
+        }
+        .search-bar {
+            width: 100%; padding: 10px; background: #121212; border: 1px solid #444; color: white;
+            margin-bottom: 10px; border-radius: 6px; font-size: 14px; box-sizing: border-box;
+        }
+        .brawlers-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap: 8px;
+            overflow-y: auto; padding-right: 5px;
+        }
+
+        /* CARTES BRAWLERS */
+        .brawler-card {
+            background: #2a2a2a; border-radius: 8px; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; padding: 6px;
+            border: 2px solid transparent; position: relative; height: 100px;
+            transition: transform 0.1s;
+        }
+        .brawler-card:hover { transform: scale(1.05); z-index: 10; background: #333; }
+        .brawler-card img { width: 60px; height: 60px; object-fit: contain; border-radius: 4px; }
+        .brawler-card .name { font-size: 10px; text-align: center; margin-top: 5px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+        .img-error-text { font-size: 8px; color: #ff6b6b; margin-top: 2px; text-align: center; line-height: 1; }
+
+        /* ÉTATS SPECIAUX (CSS) */
+        
+        /* Désactivé (Pris ou Banni) */
+        .brawler-card.disabled { opacity: 0.2; filter: grayscale(100%); pointer-events: none; order: 999; }
+        .brawler-card.banned::after { content: 'X'; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: red; font-weight: bold; text-shadow: 0 0 5px black; }
+
+        /* 1. IDEAL (Or) : Contre >= 2 ennemis */
+        .brawler-card.status-ideal {
+            border-color: var(--col-ideal); background: rgba(255, 215, 0, 0.15);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); order: -3;
+        }
+        
+        /* 2. GOOD (Vert) : Contre 1 ennemi */
+        .brawler-card.status-good {
+            border-color: var(--col-good); background: rgba(0, 255, 136, 0.1); order: -2;
+        }
+
+        /* 3. RISKY (Orange) : Contre un ennemi MAIS est contré par un autre */
+        .brawler-card.status-risky {
+            border-color: var(--col-risk); background: rgba(255, 136, 0, 0.1); order: -1;
+        }
+
+        /* 4. CRITICAL (Rouge) : Double Faiblesse (Contré par un ennemi qui bat DEJA un allié) */
+        .brawler-card.status-crit {
+            border-color: var(--col-crit); background: rgba(255, 0, 51, 0.15);
+            /* Pas d'ordre spécial : on laisse en bas sauf si on filtre, mais c'est un avertissement visuel fort */
+        }
+
+        /* BADGES */
+        .badge-score {
+            position: absolute; top: -4px; right: -4px;
+            background: var(--col-ideal); color: black; font-size: 9px; font-weight: bold;
+            padding: 2px 5px; border-radius: 8px; box-shadow: 0 2px 2px black; z-index: 5;
+        }
+        .badge-risk {
+            position: absolute; top: -4px; right: -4px;
+            background: var(--col-risk); color: black; font-size: 10px; font-weight: bold;
+            width: 16px; height: 16px; border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 2px 2px black; z-index: 5;
+        }
+        .badge-crit {
+            position: absolute; top: -4px; left: -4px;
+            background: var(--col-crit); color: white; font-size: 10px; font-weight: bold;
+            width: 18px; height: 18px; border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 2px 2px black; z-index: 5; border: 1px solid white;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="controls">
+            <button class="btn-reset" onclick="resetDraft()">RESET</button>
+            <button class="btn-undo" onclick="undoLast()">UNDO</button>
+        </div>
+        
+        <div class="legend">
+            <span><div class="dot" style="background:var(--col-ideal)"></div>Idéal (x2+)</span>
+            <span><div class="dot" style="background:var(--col-good)"></div>Bon</span>
+            <span><div class="dot" style="background:var(--col-risk)"></div>Risqué (Trade)</span>
+            <span><div class="dot" style="background:var(--col-crit)"></div>⛔ Double Faiblesse</span>
+        </div>
+
+        <div class="bans-container">
+            <div class="ban-slot" onclick="selectSlot(this, 'ban', 0)"></div>
+            <div class="ban-slot" onclick="selectSlot(this, 'ban', 1)"></div>
+            <div class="ban-slot" onclick="selectSlot(this, 'ban', 2)"></div>
+            <div class="ban-slot" onclick="selectSlot(this, 'ban', 3)"></div>
+            <div class="ban-slot" onclick="selectSlot(this, 'ban', 4)"></div>
+            <div class="ban-slot" onclick="selectSlot(this, 'ban', 5)"></div>
+        </div>
+    </div>
+
+    <div class="draft-area">
+        <div class="team-panel">
+            <h3 style="color: var(--pick-enemy); text-align: center; font-size:14px; margin-bottom:5px;">ADVERSAIRES</h3>
+            <div class="pick-slot enemy" onclick="selectSlot(this, 'enemy', 0)"><span>Pick 1</span></div>
+            <div class="pick-slot enemy" onclick="selectSlot(this, 'enemy', 1)"><span>Pick 2</span></div>
+            <div class="pick-slot enemy" onclick="selectSlot(this, 'enemy', 2)"><span>Pick 3</span></div>
+        </div>
+
+        <div class="grid-container">
+            <input type="text" id="searchInput" class="search-bar" placeholder="Chercher un brawler..." onkeyup="filterGrid()">
+            <div class="brawlers-grid" id="grid"></div>
+        </div>
+
+        <div class="team-panel">
+            <h3 style="color: var(--pick-ally); text-align: center; font-size:14px; margin-bottom:5px;">MON ÉQUIPE</h3>
+            <div class="pick-slot ally" onclick="selectSlot(this, 'ally', 0)"><span>Pick 1</span></div>
+            <div class="pick-slot ally" onclick="selectSlot(this, 'ally', 1)"><span>Pick 2</span></div>
+            <div class="pick-slot ally" onclick="selectSlot(this, 'ally', 2)"><span>Pick 3</span></div>
+        </div>
+    </div>
+
+    <script>
+        // --- DONNEES ---
+        const rawData = {
+            "8-BIT": ["Belle", "Squeak", "Penny", "Barley", "Sprout", "Bo", "Mina"],
+            "ALLI": ["Doug", "Trunk", "Bull", "R-T", "Jacky"],
+            "AMBER": ["Crow", "Belle", "Lily", "Byron", "Sprout"],
+            "ANGELO": ["Gray", "Max", "Nani", "Eve", "Darryl"],
+            "ASH": ["Frank", "Trunk", "Otis", "Mina", "Carl", "Emz"],
+            "BARLEY": ["Sprout", "Tick", "Griff", "Kaze", "Lily", "Carl", "Stu", "Brock"],
+            "BEA": ["Brock", "Belle", "Sprout", "Bo", "Gus"],
+            "BELLE": ["Piper", "Byron", "Nani", "Sprout", "Mandy"],
+            "BERRY": ["Barley", "Frank", "Griff", "Kaze", "Dynamike"],
+            "BIBI": ["Bea", "Lumi", "Ash", "Bull", "Griff"],
+            "BO": ["Kaze", "Lily", "Stu", "Piper", "Kenji"],
+            "BONNIE": ["Nani", "Piper", "Brock", "Charlie", "Angelo", "Tick"],
+            "BROCK": ["Piper", "Angelo", "Nani", "Mandy", "Jae-yong", "Max", "Darryl", "Kaze", "Ollie"],
+            "BULL": ["Tara", "Cordelius", "Charlie", "Willow", "Griff"],
+            "BUSTER": ["Ash", "Brock", "Squeak", "Trunk", "Willow", "Barley"],
+            "BUZZ": ["Bull", "Doug", "Gene", "Finx", "Stu", "Meeple", "Cordelius"],
+            "BYRON": ["Piper", "Nani", "Sprout", "Tick", "Poco", "Kaze", "Lily"],
+            "CARL": ["Stu", "Darryl", "Buster", "Colette", "Crow", "Gus", "Buzz"],
+            "CHARLIE": ["Squeak", "Byron", "Brock", "Angelo", "Amber", "Sprout", "Tick", "Willow", "Penny", "Jae-yong"],
+            "CHESTER": ["Squeak", "Carl", "Crow", "Byron", "Belle", "Sprout", "Barley", "Willow"],
+            "CHUCK": ["Kaze", "Darryl", "Cordelius", "Mina", "Melodie"],
+            "CLANCY": ["Juju", "Larry & Lawrie", "Bea", "Ziggy", "Ruffs", "Charlie"],
+            "COLETTE": ["Belle", "Byron", "Bea", "Crow", "Squeak", "Charlie", "Willow"],
+            "COLT": ["Piper", "Belle", "Crow", "Max", "Jae-yong"],
+            "CORDELIUS": ["Sandy", "Buster", "Hank", "Ash", "Ruffs", "Tara", "Willow", "Barley"],
+            "CROW": ["Gus", "Belle", "Ruffs", "Otis", "Charlie", "Willow", "Juju"],
+            "DARRYL": ["Tara", "Charlie", "Cordelius", "Colette", "Otis", "Lou", "Bea", "Shelly"],
+            "DOUG": ["Griff", "Willow", "Gene", "Squeak", "Cordelius", "Charlie"],
+            "DRACO": ["Lou", "Lumi", "Lola", "Willow", "Otis", "Tara"],
+            "DYNAMIKE": ["Mortis", "Kaze", "Brock", "Gray", "Stu", "Sprout"],
+            "EDGAR": ["Bull", "Doug", "Cordelius", "Charlie", "Stu", "R-T", "Gale", "Mina"],
+            "EL PRIMO": ["Bea", "Griff", "Lou", "Finx", "Dynamike", "Willow"],
+            "EMZ": ["Sprout", "Barley", "Crow", "Squeak", "Bea", "Belle", "Kaze", "Mortis", "Lily"],
+            "EVE": ["Belle", "Carl", "Alli", "Amber", "Penny", "Brock"],
+            "FANG": ["R-T", "Charlie", "Cordelius", "Doug", "Griff"],
+            "FINX": ["Crow", "Ruffs", "Otis", "Bo", "Barley", "Belle", "Byron", "Spike"],
+            "FRANK": ["Colette", "El Primo", "Bull", "Bea", "Trunk", "Lumi", "Lou", "Maisie", "Ruffs", "Willow", "Dynamike"],
+            "GALE": ["Belle", "Bea", "Sprout", "Barley", "Willow", "Crow", "Lola", "Squeak"],
+            "GENE": ["Ruffs", "Charlie", "Tick", "Sprout", "Grom", "Penny", "Belle"],
+            "GIGI": ["Doug", "Buster", "Gene", "Willow", "Bull"],
+            "GRAY": ["Tara", "Charlie", "Gus", "Ruffs", "Eve", "Brock", "Jae-yong", "Max", "Ash", "Ollie"],
+            "GRIFF": ["Bea", "Belle", "Crow", "Spike", "Brock", "Janet", "Stu"],
+            "GROM": ["Mortis", "Kaze", "Lily", "Tick", "Brock", "Max", "Jae-yong", "Darryl"],
+            "GUS": ["Ruffs", "Byron", "Angelo", "Piper", "Sprout", "Tick", "Charlie", "Ash"],
+            "HANK": ["Dynamike", "Barley", "Pam", "Otis", "Ruffs", "El Primo", "Frank", "Lou", "Bea", "Lumi", "Griff", "Willow"],
+            "JACKY": ["Lumi", "Bea", "Griff", "Lou", "Crow", "Otis", "Barley", "Willow", "Doug", "Frank", "Trunk", "Spike", "Cordelius", "Surge"],
+            "JAE-YONG": ["Crow", "Belle", "Bea", "Otis", "Lola", "Kaze", "Lily"],
+            "JANET": ["Belle", "Gus", "Crow", "Barley", "Sprout", "Otis", "Squeak"],
+            "JESSIE": ["Barley", "Berry", "Belle", "Gus", "Brock", "Kaze"],
+            "JUJU": ["Alli", "Larry & Lawrie", "Brock", "Piper", "Carl", "Edgar", "Griff", "Barley"],
+            "KAZE": ["Crow", "Gene", "Meeple", "Amber", "Cordelius", "Otis", "Doug", "Buster", "Meg"],
+            "KENJI": ["Meg", "Otis", "Frank", "Crow", "Tara", "Jacky", "Trunk", "Bea", "Cordelius", "Bull", "Ash"],
+            "KIT": ["Gene", "Amber", "Crow", "Bull", "Jacky"],
+            "LARRY & LAWRIE": ["Sprout", "Tick", "Griff", "Brock", "Kaze", "Mortis", "Lily", "Ziggy", "Stu"],
+            "LEON": ["Gene", "Meg", "Crow", "Belle", "Stu"],
+            "LILY": ["Nita", "Jacky", "Buster", "Bull", "Gene", "Cordelius", "Crow"],
+            "LOLA": ["Belle", "Penny", "Squeak", "Byron", "Sprout", "Barley", "Willow"],
+            "LOU": ["Bea", "Sprout", "Barley", "Willow", "Belle", "Byron", "Stu", "Ruffs", "Poco"],
+            "LUMI": ["Kaze", "Lily", "Byron", "Belle", "Willow", "Sprout", "Barley"],
+            "MAISIE": ["Belle", "Gus", "Charlie", "Tara", "Sprout", "Barley", "Willow", "Gene", "Crow", "Ruffs"],
+            "MANDY": ["Nani", "Gray", "Angelo", "Piper", "Darryl", "Kaze", "Tick"],
+            "MAX": ["Crow", "Lola", "Belle", "Bea", "Otis"],
+            "MEEPLE": ["Ruffs", "Lily", "Max", "Charlie", "Brock", "Gray", "Willow", "Sprout", "Janet", "Jessie", "Moe", "Pam"],
+            "MEG": ["Crow", "Colette", "Lou", "Amber", "Byron", "Belle", "Finx", "Barley", "Larry & Lawrie", "Dynamike", "Bea"],
+            "MELODIE": ["Crow", "Amber", "R-T", "Tara", "Cordelius", "Charlie"],
+            "MICO": ["R-T", "Lily", "Meg", "Nani", "Bull", "Cordelius"],
+            "MINA": ["Crow", "Otis", "Tara", "Charlie", "Sprout", "Barley", "Lola", "Stu", "Ruffs"],
+            "MOE": ["Ruffs", "Otis", "Gus", "Ash", "Crow", "Barley", "Larry & Lawrie"],
+            "MORTIS": ["Jacky", "Doug", "Shelly", "Bull", "Cordelius", "Nita", "Stu", "Maisie", "Griff", "Gus"],
+            "MR. P": ["Carl", "Ollie", "Mortis", "Byron", "Squeak"],
+            "NANI": ["Max", "Gene", "Leon", "Jae-yong", "Tick", "Eve"],
+            "NITA": ["Otis", "Griff", "Barley", "Larry & Lawrie", "Dynamike", "Amber", "Lumi"],
+            "OLLIE": ["Lumi", "Buster", "Gene", "Poco", "Cordelius"],
+            "OTIS": ["Belle", "Gus", "Bea", "Barley", "Willow", "Squeak"],
+            "PAM": ["Ruffs", "Barley", "Larry & Lawrie", "Bea", "Belle", "Lola", "Penny", "Squeak", "Colette"],
+            "PEARL": ["Brock", "Gene", "Tick", "Barley", "Belle", "Bea", "Gus", "Lola", "Squeak"],
+            "PENNY": ["Belle", "Byron", "Nani", "Squeak", "Sprout", "Barley", "Carl", "Berry", "Bo", "Brock"],
+            "PIPER": ["Nani", "Max", "Jae-yong", "Kaze", "Tick", "Sprout"],
+            "POCO": ["Lola", "Crow", "Belle", "Kaze", "Mortis", "Barley", "Dynamike", "Willow"],
+            "RICO": ["Squeak", "Sprout", "Barley", "Carl", "Stu", "Griff", "Brock", "Kaze", "Buzz"],
+            "ROSA": ["Frank", "Amber", "Otis", "Lumi", "Lola", "Crow"],
+            "R-T": ["Charlie", "Sprout", "Barley", "Willow", "Eve", "Squeak", "Brock", "Ruffs"],
+            "RUFFS": ["Squeak", "Barley", "Sprout", "Angelo", "Byron", "Penny", "Janet"],
+            "SAM": ["Bea", "Frank", "Trunk", "Bull", "Otis"],
+            "SANDY": ["Barley", "Juju", "Larry & Lawrie", "Emz", "Amber", "Crow", "Griff"],
+            "SHADE": ["Hank", "Jacky", "Bull", "Trunk", "Cordelius", "Doug", "Meeple", "Frank", "Stu", "Buzz"],
+            "SHELLY": ["Bea", "Tara", "Gus", "Ash", "Barley", "Sprout"],
+            "SPIKE": ["Belle", "Gus", "Byron", "Sprout", "Barley", "Penny", "Jae-yong", "Carl", "Janet"],
+            "SPROUT": ["Tick", "Kaze", "Brock", "Stu", "Lily", "Mortis"],
+            "SQUEAK": ["Darryl", "Trunk", "Nani", "Piper", "Brock", "Kaze", "Lily", "Buzz", "Sprout", "Tick"],
+            "STU": ["Gus", "Belle", "Lola", "Ruffs", "Crow", "Tara", "Charlie", "Poco", "Bea"],
+            "SURGE": ["Ruffs", "Ash", "Gus", "Bea", "Belle", "Barley", "Willow", "Tara", "Spike", "Charlie", "Otis"],
+            "TARA": ["Janet", "Sprout", "Barley", "Willow", "Byron", "Carl", "Amber", "Sandy", "Jae-yong", "Buster"],
+            "TICK": ["Alli", "Gray", "Piper", "Angelo", "Brock", "Max", "Kaze", "Lily", "Jae-yong"],
+            "TRUNK": ["Griff", "Bea", "Lumi", "Frank", "Hank", "Draco"],
+            "WILLOW": ["Barley", "Sprout", "Brock", "Lily", "Kaze", "Stu", "Alli"],
+            "ZIGGY": ["Mortis", "Lily", "Kaze", "Piper", "Brock", "Darryl", "Trunk", "Max", "Jae-yong"]
+        };
+
+        // --- UTILITAIRES ---
+        function formatName(name) {
+            if(!name) return "";
+            name = String(name).trim();
+            if (name.toUpperCase() === "8-BIT") return "8-Bit";
+            if (name.toUpperCase() === "R-T") return "R-T";
+            if (name.toUpperCase() === "MR. P" || name.toUpperCase() === "MR.P") return "Mr. P";
+            return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+        }
+
+        function getFileName(name) {
+            return name.toLowerCase().replace(/&/g, '').replace(/\./g, '').replace(/[\s-]+/g, '_') + '_portrait.png';
+        }
+
+        // --- INIT DATA ---
+        const counterData = {};
+        const allBrawlersSet = new Set();
+        Object.keys(rawData).forEach(key => {
+            const cleanKey = formatName(key);
+            allBrawlersSet.add(cleanKey);
+            const counters = rawData[key].map(val => {
+                const cleanVal = formatName(val);
+                allBrawlersSet.add(cleanVal);
+                return cleanVal;
+            });
+            if(counterData[cleanKey]) counterData[cleanKey] = [...new Set([...(counterData[cleanKey]||[]), ...counters])];
+            else counterData[cleanKey] = counters;
+        });
+        const allBrawlers = Array.from(allBrawlersSet).sort();
+        
+        // --- STATE ---
+        let state = { ban: [null,null,null,null,null,null], enemy: [null,null,null], ally: [null,null,null], activeSlot: {type:null,index:null}, history: [] };
+
+        // --- LOGIQUE METIER ---
+        // Qui contre "brawlerName" ? (Weaknesses)
+        function getWeaknessesOf(brawlerName) {
+            return counterData[brawlerName] || [];
+        }
+
+        // --- INIT GRILLE ---
+        const gridElement = document.getElementById('grid');
+        function initGrid() {
+            gridElement.innerHTML = '';
+            allBrawlers.forEach(brawler => {
+                const div = document.createElement('div');
+                div.className = 'brawler-card';
+                div.id = `card-${brawler.replace(/[\s.]/g, '-')}`; 
+                div.onclick = () => handleBrawlerClick(brawler);
+                
+                const fileName = getFileName(brawler);
+                div.innerHTML = `
+                    <img src="icons/${fileName}" onerror="this.onerror=null; this.src='https://via.placeholder.com/60?text=?'; this.parentElement.querySelector('.img-error-text').innerText = 'Manque: ${fileName}';">
+                    <div class="name">${brawler}</div>
+                    <div class="img-error-text"></div>
+                `;
+                gridElement.appendChild(div);
+            });
+        }
+
+        function selectSlot(element, type, index) {
+            document.querySelectorAll('.ban-slot, .pick-slot').forEach(el => el.classList.remove('active'));
+            state.activeSlot = { type, index };
+            element.classList.add('active');
+        }
+
+        function handleBrawlerClick(brawlerName) {
+            if (!state.activeSlot.type) { alert("Sélectionnez d'abord un emplacement !"); return; }
+            saveHistory();
+            const { type, index } = state.activeSlot;
+            
+            if (type !== 'ban' && isPickedOrBanned(brawlerName)) {
+                if (state[type][index] !== brawlerName) return; 
+            }
+            
+            state[type][index] = brawlerName;
+            updateSlotUI(type, index, brawlerName);
+            updateGridState();
+        }
+
+        function isPickedOrBanned(name) {
+            if (state.ban.includes(name)) return true;
+            if (state.enemy.includes(name)) return true;
+            if (state.ally.includes(name)) return true;
+            return false;
+        }
+
+        function updateSlotUI(type, index, name) {
+            const fileName = getFileName(name);
+            let element;
+            if (type === 'ban') {
+                element = document.querySelectorAll('.ban-slot')[index];
+                element.innerHTML = `<img src="icons/${fileName}" onerror="this.src='https://via.placeholder.com/60?text=${name.charAt(0)}'"><div class="ban-icon-overlay">X</div>`;
+                element.classList.add('banned');
+            } else {
+                const panelIndex = type === 'enemy' ? 0 : 1;
+                element = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[index];
+                element.innerHTML = `<img src="icons/${fileName}" onerror="this.src='https://via.placeholder.com/100?text=?'"><span>${name}</span>`;
+            }
+        }
+
+        function updateGridState() {
+            const activeEnemies = state.enemy.filter(e => e);
+            const activeAllies = state.ally.filter(a => a);
+
+            // "Threatening Enemies" = Ennemis actifs qui battent DÉJÀ un allié actif.
+            // Si je choisis un brawler aussi battu par un de ces ennemis, je crée une Double Faiblesse.
+            let threateningEnemies = new Set();
+            activeAllies.forEach(ally => {
+                const weaknesses = getWeaknessesOf(ally);
+                weaknesses.forEach(w => {
+                    // Si ce counter est un ennemi actif, alors cet ennemi est "Menaçant"
+                    if (activeEnemies.includes(w)) {
+                        threateningEnemies.add(w);
+                    }
+                });
+            });
+
+            allBrawlers.forEach(brawler => {
+                const safeId = brawler.replace(/[\s.]/g, '-');
+                const card = document.getElementById(`card-${safeId}`);
+                if (!card) return;
+                
+                // Reset pur
+                card.className = 'brawler-card';
+                const badges = card.querySelectorAll('.badge-score, .badge-risk, .badge-crit');
+                badges.forEach(b => b.remove());
+
+                // 1. Disable
+                if (state.ban.includes(brawler)) {
+                    card.classList.add('disabled', 'banned');
+                    return;
+                } else if (activeEnemies.includes(brawler) || activeAllies.includes(brawler)) {
+                    card.classList.add('disabled');
+                    return;
+                }
+
+                // 2. ANALYSE
+                // A. Score Offensif
+                let score = 0;
+                activeEnemies.forEach(enemy => {
+                    if (getWeaknessesOf(enemy).includes(brawler)) score++;
+                });
+
+                // B. Risque (Trade) : Contré par un ennemi actif
+                let isRisk = false;
+                const myWeaknesses = getWeaknessesOf(brawler);
+                activeEnemies.forEach(enemy => {
+                    if (myWeaknesses.includes(enemy)) isRisk = true;
+                });
+
+                // C. CRITIQUE (Double Faiblesse)
+                // Est-ce que mes faiblesses incluent un "Ennemi Menaçant" ?
+                let isCrit = false;
+                myWeaknesses.forEach(w => {
+                    if (threateningEnemies.has(w)) isCrit = true;
+                });
+
+                // 3. APPLICATION VISUELLE
+                
+                // Priorité Absolue : Critique (Rouge)
+                if (isCrit) {
+                    card.classList.add('status-crit');
+                    addBadge(card, 'badge-crit', '⛔');
+                }
+                // Sinon : Logique Classique
+                else if (score >= 2) {
+                    card.classList.add('status-ideal');
+                    addBadge(card, 'badge-score', 'x' + score);
+                } 
+                else if (score === 1) {
+                    if (isRisk) {
+                        card.classList.add('status-risky');
+                        addBadge(card, 'badge-risk', '!');
+                    } else {
+                        card.classList.add('status-good');
+                    }
+                }
+            });
+        }
+
+        function addBadge(card, className, text) {
+            const div = document.createElement('div');
+            div.className = className;
+            div.innerText = text;
+            card.appendChild(div);
+        }
+
+        function filterGrid() {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            const cards = document.querySelectorAll('.brawler-card');
+            cards.forEach(card => {
+                const name = card.querySelector('.name').innerText.toLowerCase();
+                card.style.display = name.includes(term) ? 'flex' : 'none';
+            });
+        }
+
+        function saveHistory() {
+            state.history.push(JSON.parse(JSON.stringify({ ban: state.ban, enemy: state.enemy, ally: state.ally })));
+            if (state.history.length > 10) state.history.shift();
+        }
+
+        function undoLast() {
+            if (state.history.length === 0) return;
+            const prev = state.history.pop();
+            state.ban = prev.ban; state.enemy = prev.enemy; state.ally = prev.ally;
+            
+            state.ban.forEach((b, i) => b ? updateSlotUI('ban', i, b) : clearSlot('ban', i));
+            state.enemy.forEach((b, i) => b ? updateSlotUI('enemy', i, b) : clearSlot('enemy', i));
+            state.ally.forEach((b, i) => b ? updateSlotUI('ally', i, b) : clearSlot('ally', i));
+            updateGridState();
+        }
+
+        function clearSlot(type, index) {
+             if (type === 'ban') {
+                const el = document.querySelectorAll('.ban-slot')[index];
+                el.innerHTML = ''; el.classList.remove('banned');
+            } else {
+                const panelIndex = type === 'enemy' ? 0 : 1;
+                const el = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[index];
+                el.innerHTML = `<span>Pick ${index+1}</span>`;
+            }
+        }
+
+        function resetDraft() {
+            if(!confirm("Tout réinitialiser ?")) return;
+            state.ban = [null,null,null,null,null,null];
+            state.enemy = [null,null,null];
+            state.ally = [null,null,null];
+            state.history = [];
+            document.querySelectorAll('.ban-slot').forEach(el => { el.innerHTML = ''; el.classList.remove('banned'); });
+            document.querySelectorAll('.pick-slot').forEach((el, i) => {
+                const idx = Array.from(el.parentNode.children).indexOf(el) - 1; 
+                el.innerHTML = `<span>Pick ${idx + 1}</span>`;
+            });
+            updateGridState();
+        }
+
+        // --- LANCEMENT ---
+        initGrid();
+
+    </script>
+</body>
+</html>
