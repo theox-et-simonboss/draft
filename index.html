@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brawl Stars Draft Assistant - Mode Stratège V4</title>
+    <title>Brawl Stars Draft Assistant - Mode Stratège V5</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -37,7 +37,7 @@
         .controls { display: flex; gap: 10px; }
         button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; }
         .btn-reset { background: var(--col-ban); color: white; }
-        .btn-undo { background: #444; color: white; }
+        .btn-undo { background: #444; color: white; } /* Bouton EFFACER */
 
         /* LÉGENDE */
         .legend { font-size: 11px; display: flex; gap: 15px; color: #aaa; align-items: center; }
@@ -120,7 +120,6 @@
         /* 4. CRITICAL (Rouge) : Double Faiblesse (Contré par un ennemi qui bat DEJA un allié) */
         .brawler-card.status-crit {
             border-color: var(--col-crit); background: rgba(255, 0, 51, 0.15);
-            /* Pas d'ordre spécial : on laisse en bas sauf si on filtre, mais c'est un avertissement visuel fort */
         }
 
         /* BADGES */
@@ -326,7 +325,7 @@
         const allBrawlers = Array.from(allBrawlersSet).sort();
         
         // --- STATE ---
-        let state = { ban: [null,null,null,null,null,null], enemy: [null,null,null], ally: [null,null,null], activeSlot: {type:null,index:null}, history: [] };
+        let state = { ban: [null,null,null,null,null,null], enemy: [null,null,null], ally: [null,null,null], activeSlot: {type:null,index:null} };
 
         // --- LOGIQUE METIER ---
         // Qui contre "brawlerName" ? (Weaknesses)
@@ -362,9 +361,12 @@
 
         function handleBrawlerClick(brawlerName) {
             if (!state.activeSlot.type) { alert("Sélectionnez d'abord un emplacement !"); return; }
-            saveHistory();
+            
             const { type, index } = state.activeSlot;
             
+            // Empêcher de re-sélectionner un brawler déjà pris (sauf pour les bans qui peuvent être doublons si besoin, mais ici on limite généralement)
+            // Dans votre règle : Bans = doublons OK, Picks = sans doublons.
+            // On vérifie donc seulement si c'est un pick et que le brawler est déjà ailleurs.
             if (type !== 'ban' && isPickedOrBanned(brawlerName)) {
                 if (state[type][index] !== brawlerName) return; 
             }
@@ -372,6 +374,14 @@
             state[type][index] = brawlerName;
             updateSlotUI(type, index, brawlerName);
             updateGridState();
+
+            // --- AUTO ADVANCE POUR LES BANS ---
+            // Si on est sur un ban et qu'on n'est pas au dernier (index 5)
+            if (type === 'ban' && index < 5) {
+                const nextIndex = index + 1;
+                const nextSlot = document.querySelectorAll('.ban-slot')[nextIndex];
+                selectSlot(nextSlot, 'ban', nextIndex);
+            }
         }
 
         function isPickedOrBanned(name) {
@@ -399,13 +409,11 @@
             const activeEnemies = state.enemy.filter(e => e);
             const activeAllies = state.ally.filter(a => a);
 
-            // "Threatening Enemies" = Ennemis actifs qui battent DÉJÀ un allié actif.
-            // Si je choisis un brawler aussi battu par un de ces ennemis, je crée une Double Faiblesse.
+            // "Threatening Enemies"
             let threateningEnemies = new Set();
             activeAllies.forEach(ally => {
                 const weaknesses = getWeaknessesOf(ally);
                 weaknesses.forEach(w => {
-                    // Si ce counter est un ennemi actif, alors cet ennemi est "Menaçant"
                     if (activeEnemies.includes(w)) {
                         threateningEnemies.add(w);
                     }
@@ -438,28 +446,24 @@
                     if (getWeaknessesOf(enemy).includes(brawler)) score++;
                 });
 
-                // B. Risque (Trade) : Contré par un ennemi actif
+                // B. Risque (Trade)
                 let isRisk = false;
                 const myWeaknesses = getWeaknessesOf(brawler);
                 activeEnemies.forEach(enemy => {
                     if (myWeaknesses.includes(enemy)) isRisk = true;
                 });
 
-                // C. CRITIQUE (Double Faiblesse)
-                // Est-ce que mes faiblesses incluent un "Ennemi Menaçant" ?
+                // C. CRITIQUE
                 let isCrit = false;
                 myWeaknesses.forEach(w => {
                     if (threateningEnemies.has(w)) isCrit = true;
                 });
 
                 // 3. APPLICATION VISUELLE
-                
-                // Priorité Absolue : Critique (Rouge)
                 if (isCrit) {
                     card.classList.add('status-crit');
                     addBadge(card, 'badge-crit', '⛔');
                 }
-                // Sinon : Logique Classique
                 else if (score >= 2) {
                     card.classList.add('status-ideal');
                     addBadge(card, 'badge-score', 'x' + score);
@@ -491,34 +495,20 @@
             });
         }
 
-        function saveHistory() {
-            state.history.push(JSON.parse(JSON.stringify({ ban: state.ban, enemy: state.enemy, ally: state.ally })));
-            if (state.history.length > 10) state.history.shift();
-        }
-
-        // Remplace la fonction undoLast()
+        // --- NOUVELLE FONCTION : EFFACER ---
         function clearCurrentSlot() {
-    // Récupérer le type (ban, enemy, ally) et l'index de la case sélectionnée (en jaune/bleu/orange)
             const { type, index } = state.activeSlot;
+            if (!type) return;
 
-    // Si aucune case n'est sélectionnée, on ne fait rien (ou on prévient)
-            if (!type) {
-        // Optionnel : alert("Veuillez sélectionner une case à vider.");
-                return;
-            }
-
-    // 1. Mettre à jour les données (State)
-    // On remet la valeur à null dans le tableau correspondant
-    state[type][index] = null;
-
-    // 2. Mettre à jour l'interface (UI)
-    // On utilise votre fonction existante clearSlot qui gère déjà l'affichage (retire l'image, remet le texte "Pick X")
-    clearSlot(type, index);
-
-    // 3. Recalculer les suggestions
-    // Comme un brawler a été retiré, les scores et les contres doivent être mis à jour
-    updateGridState();
-}
+            // Vider la donnée
+            state[type][index] = null;
+            
+            // Vider l'UI
+            clearSlot(type, index);
+            
+            // Recalculer
+            updateGridState();
+        }
 
         function clearSlot(type, index) {
              if (type === 'ban') {
@@ -536,20 +526,26 @@
             state.ban = [null,null,null,null,null,null];
             state.enemy = [null,null,null];
             state.ally = [null,null,null];
-            state.history = [];
+            
             document.querySelectorAll('.ban-slot').forEach(el => { el.innerHTML = ''; el.classList.remove('banned'); });
             document.querySelectorAll('.pick-slot').forEach((el, i) => {
                 const idx = Array.from(el.parentNode.children).indexOf(el) - 1; 
                 el.innerHTML = `<span>Pick ${idx + 1}</span>`;
             });
             updateGridState();
+
+            // Resélectionner automatiquement le premier ban
+            setTimeout(() => {
+                selectSlot(document.querySelectorAll('.ban-slot')[0], 'ban', 0);
+            }, 50);
         }
 
         // --- LANCEMENT ---
         initGrid();
+        
+        // Sélectionner le premier ban au chargement
+        selectSlot(document.querySelectorAll('.ban-slot')[0], 'ban', 0);
 
     </script>
 </body>
 </html>
-
-
