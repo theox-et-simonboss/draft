@@ -198,9 +198,9 @@
             transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
         
-        /* RECTANGLE MODE (ACTIVE) */
+        /* RECTANGLE MODE (ACTIVE) - COMPACT */
         .brawler-card.expanded {
-            height: 110px; /* Reduced from 145px for compactness */
+            height: 110px; /* Reduced height for compactness */
             justify-content: flex-start;
             background: #252e3d;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -236,7 +236,7 @@
         .brawler-card.banned { opacity: 0.5; pointer-events: none; border-color: var(--col-ban); filter: grayscale(100%); }
         .brawler-card.banned::after { content: '✕'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; color: var(--col-ban); font-weight: bold; }
 
-        /* MINI ICONS */
+        /* MINI ICONS - HORIZONTAL LAYOUT */
         .interactions-container { 
             width: 100%; 
             display: none; 
@@ -808,16 +808,28 @@
                 return;
             }
 
+            // Case 1: Backspace -> Clear everything + Focus + Reset Grid
+            if (e.key === 'Backspace') {
+                searchInput.value = '';
+                searchInput.focus();
+                filterGrid(); // Updates grid to show all
+                return;
+            }
+
+            // Case 2: Printable Character -> Clear previous search + Focus + Allow typing
             // Detect if key is a printable character (length 1) and not a modifier combo
             if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                searchInput.value = '';
                 searchInput.focus();
                 // The keypress event will naturally populate the input since we focused it
-                // in the keydown phase (usually works). If not, we could append e.key manually.
+                // in the keydown phase (usually works).
             }
             // Keep Ctrl+F as fallback/habit
             else if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
                 e.preventDefault(); 
-                searchInput.focus(); searchInput.select(); 
+                searchInput.value = '';
+                searchInput.focus();
+                filterGrid(); 
             }
         });
 
