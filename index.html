@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Draft Board by Theox & Simon boss</title>
+    <title>Draft Board</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
@@ -44,10 +44,10 @@
             overflow: hidden;
         }
 
-        /* --- TOP BAR --- */
+        /* --- TOP BAR (Modified Layout) --- */
         .top-bar { 
-            display: flex; 
-            justify-content: space-between; 
+            display: grid; /* Changed to Grid for perfect centering */
+            grid-template-columns: 1fr auto 1fr; /* Left (1fr) Center (auto) Right (1fr) */
             align-items: center; 
             margin-bottom: 20px;
             padding: 16px 24px;
@@ -58,15 +58,11 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        .header-title {
-            font-size: 20px; font-weight: 700; color: var(--text-main); letter-spacing: -0.025em;
-        }
-        .header-title .authors {
-            font-weight: 400; color: var(--text-muted); font-size: 14px; margin-left: 8px;
-        }
+        /* Align grid items */
+        .roster-controls { justify-self: start; }
+        .bans-container-wrapper { justify-self: center; } /* Wrapper to center the bans */
+        .controls { justify-self: end; display: flex; gap: 10px; }
 
-        .controls { display: flex; gap: 10px; }
-        
         button { 
             padding: 8px 16px; border: 1px solid transparent; border-radius: 8px; 
             cursor: pointer; font-weight: 600; font-size: 13px; font-family: 'Inter', sans-serif;
@@ -97,6 +93,37 @@
         .ban-slot img { width: 100%; height: 100%; object-fit: cover; opacity: 0.5; filter: grayscale(100%); }
         .ban-slot.banned { border-color: var(--col-ban); background: rgba(220, 38, 38, 0.1); }
         .ban-icon-overlay { position: absolute; font-size: 18px; color: var(--col-ban); font-weight: bold; pointer-events: none; }
+
+        /* --- ROSTER MODAL & TOGGLE STYLES --- */
+        .roster-item {
+            cursor: pointer;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            opacity: 0.3;
+            filter: grayscale(100%);
+            transition: all 0.1s;
+            position: relative;
+            background: #000;
+        }
+        .roster-item.owned {
+            opacity: 1;
+            filter: grayscale(0%);
+            border-color: var(--col-good);
+        }
+        .roster-item:hover {
+            transform: scale(1.05);
+            z-index: 10;
+        }
+        .roster-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        /* Style for active toggle */
+        .toggle-active #roster-toggle-btn { background: var(--pick-ally) !important; }
+        .toggle-active #roster-toggle-circle { transform: translateX(16px) !important; }
 
         /* --- DRAFT AREA --- */
         .draft-area { display: flex; flex: 1; gap: 24px; overflow: hidden; }
@@ -136,7 +163,7 @@
             border-radius: 50%;
             border: 1px solid rgba(255,255,255,0.3);
             display: flex; justify-content: center; align-items: center;
-            opacity: 0; /* Caché par défaut */
+            opacity: 0; /* Hidden by default */
             transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
             cursor: pointer;
             z-index: 20;
@@ -144,13 +171,13 @@
             pointer-events: auto;
         }
         
-        /* Apparition au survol du slot */
+        /* Appear on hover */
         .pick-slot:hover .isolation-eye { 
             opacity: 1; 
             transform: translate(-50%, -50%) scale(1);
         }
         
-        /* État actif (cliqué) */
+        /* Active state (clicked) */
         .isolation-eye.active-eye {
             opacity: 1;
             transform: translate(-50%, -50%) scale(1.1);
@@ -163,7 +190,7 @@
         .isolation-eye svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 
-        /* --- MINI ICONES --- */
+        /* --- MINI ICONS --- */
         .slot-interactions {
             position: absolute;
             top: 4px; left: 4px; right: 4px;
@@ -337,17 +364,25 @@
     </div>
 
     <div class="top-bar">
-        <div class="header-title">
-            Draft Board <span class="authors">by Theox & Simon boss</span>
+        <div class="roster-controls" style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn-undo" onclick="openRosterModal()">⚙️ My Roster</button>
+            <div class="toggle-container" onclick="toggleOwnedFilter()" style="cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted);">
+                <div id="roster-toggle-btn" style="width: 36px; height: 20px; background: #374151; border-radius: 20px; position: relative; transition: 0.2s;">
+                    <div id="roster-toggle-circle" style="width: 16px; height: 16px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.2s;"></div>
+                </div>
+                <span>Filter: Owned</span>
+            </div>
         </div>
         
-        <div class="bans-container">
-            <div class="ban-slot" onclick="selectSlot(this, 'ban', 0)"></div>
-            <div class="ban-slot" onclick="selectSlot(this, 'ban', 1)"></div>
-            <div class="ban-slot" onclick="selectSlot(this, 'ban', 2)"></div>
-            <div class="ban-slot" onclick="selectSlot(this, 'ban', 3)"></div>
-            <div class="ban-slot" onclick="selectSlot(this, 'ban', 4)"></div>
-            <div class="ban-slot" onclick="selectSlot(this, 'ban', 5)"></div>
+        <div class="bans-container-wrapper">
+            <div class="bans-container">
+                <div class="ban-slot" onclick="selectSlot(this, 'ban', 0)"></div>
+                <div class="ban-slot" onclick="selectSlot(this, 'ban', 1)"></div>
+                <div class="ban-slot" onclick="selectSlot(this, 'ban', 2)"></div>
+                <div class="ban-slot" onclick="selectSlot(this, 'ban', 3)"></div>
+                <div class="ban-slot" onclick="selectSlot(this, 'ban', 4)"></div>
+                <div class="ban-slot" onclick="selectSlot(this, 'ban', 5)"></div>
+            </div>
         </div>
 
         <div class="controls">
@@ -391,6 +426,22 @@
             <div class="pick-slot ally" onclick="selectSlot(this, 'ally', 0)"><span>Pick 1</span></div>
             <div class="pick-slot ally" onclick="selectSlot(this, 'ally', 1)"><span>Pick 2</span></div>
             <div class="pick-slot ally" onclick="selectSlot(this, 'ally', 2)"><span>Pick 3</span></div>
+        </div>
+    </div>
+
+    <div id="roster-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; backdrop-filter: blur(5px); background: rgba(0,0,0,0.7); justify-content: center; align-items: center;">
+        <div style="background: var(--card-bg); width: 80%; max-width: 800px; max-height: 80vh; border-radius: 16px; border: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 20px;">Manage My Brawlers</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-undo" onclick="selectAllRoster(true)">Select All</button>
+                    <button class="btn-undo" onclick="selectAllRoster(false)">Deselect All</button>
+                    <button class="fp-ally" onclick="closeRosterModal()" style="margin-left: 10px;">Save & Close</button>
+                </div>
+            </div>
+            <div style="margin-bottom: 10px; color: var(--text-muted); font-size: 13px;">Click on the brawlers you own (grayed out ones will be hidden if the filter is active).</div>
+            <div id="roster-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; padding-right: 8px;">
+                </div>
         </div>
     </div>
 
@@ -532,10 +583,12 @@
             enemy: [null,null,null], 
             ally: [null,null,null], 
             activeSlot: {type:null,index:null},
-            firstPick: 'ally'
+            firstPick: 'ally',
+            ownedBrawlers: new Set(), // User Account Roster
+            filterOwned: false        // Switch State
         };
 
-        // NOUVEAU: Variable d'état pour le mode isolé
+        // ISOLATION STATE
         let isolatedOpponentIndex = null;
 
         // --- DOM ELEMENTS ---
@@ -546,6 +599,83 @@
         // --- LOGIC ---
         function getWeaknessesOf(brawlerName) {
             return counterData[brawlerName] || [];
+        }
+
+        // --- ROSTER LOGIC ---
+        function initRoster() {
+            const stored = localStorage.getItem('draft_owned_brawlers');
+            if (stored) {
+                state.ownedBrawlers = new Set(JSON.parse(stored));
+            } else {
+                // By default, own all
+                state.ownedBrawlers = new Set(allBrawlers);
+            }
+            
+            // Load filter state
+            const filterState = localStorage.getItem('draft_filter_active');
+            state.filterOwned = filterState === 'true';
+            updateToggleUI();
+        }
+
+        function saveRoster() {
+            localStorage.setItem('draft_owned_brawlers', JSON.stringify([...state.ownedBrawlers]));
+        }
+
+        function toggleOwnedFilter() {
+            state.filterOwned = !state.filterOwned;
+            localStorage.setItem('draft_filter_active', state.filterOwned);
+            updateToggleUI();
+            updateGridState(); 
+            filterGrid(); // Re-apply search text if any
+        }
+
+        function updateToggleUI() {
+            const container = document.querySelector('.toggle-container');
+            if (state.filterOwned) container.classList.add('toggle-active');
+            else container.classList.remove('toggle-active');
+        }
+
+        function openRosterModal() {
+            const grid = document.getElementById('roster-grid');
+            grid.innerHTML = '';
+            
+            allBrawlers.forEach(brawler => {
+                const div = document.createElement('div');
+                div.className = 'roster-item';
+                if (state.ownedBrawlers.has(brawler)) div.classList.add('owned');
+                
+                div.onclick = () => {
+                    if (state.ownedBrawlers.has(brawler)) state.ownedBrawlers.delete(brawler);
+                    else state.ownedBrawlers.add(brawler);
+                    
+                    div.classList.toggle('owned');
+                    saveRoster(); 
+                };
+                
+                const fileName = getFileName(brawler);
+                div.innerHTML = `<img src="icons/${fileName}">`;
+                grid.appendChild(div);
+            });
+            
+            document.getElementById('roster-modal').style.display = 'flex';
+        }
+
+        function closeRosterModal() {
+            document.getElementById('roster-modal').style.display = 'none';
+            updateGridState();
+            filterGrid();
+        }
+
+        function selectAllRoster(all) {
+            if (all) state.ownedBrawlers = new Set(allBrawlers);
+            else state.ownedBrawlers = new Set();
+            
+            const items = document.getElementById('roster-grid').children;
+            Array.from(items).forEach((div, idx) => {
+                if(all) div.classList.add('owned');
+                else div.classList.remove('owned');
+            });
+            saveRoster();
         }
 
         // --- INIT GRID ---
@@ -612,7 +742,7 @@
             }
         }
 
-        // NOUVEAU: Fonction pour activer/désactiver le mode isolé
+        // ISOLATION TOGGLE
         function toggleIsolation(index, event) {
             if(event) event.stopPropagation();
             
@@ -622,7 +752,7 @@
                 isolatedOpponentIndex = index;
             }
             
-            // Mise à jour visuelle immédiate des yeux
+            // Visual update for eyes
             for(let i=0; i<3; i++) {
                 const eye = document.getElementById(`eye-${i}`);
                 if(eye) {
@@ -697,7 +827,7 @@
                 const panelIndex = type === 'enemy' ? 0 : 1;
                 element = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[index];
                 
-                // NOUVEAU: Ajout de l'œil si c'est un ennemi
+                // Add Eye if enemy
                 let eyeHtml = '';
                 if (type === 'enemy') {
                     const isActive = (isolatedOpponentIndex === index) ? 'active-eye' : '';
@@ -724,19 +854,19 @@
         }
 
         function updateGridState() {
-            // FIX: Nettoyage des anciens spacers pour éviter les espaces vides
+            // FIX: Clean old breaks
             const oldBreaks = activeGrid.querySelectorAll('.grid-break');
             oldBreaks.forEach(b => b.remove());
 
             const allEnemies = state.enemy.filter(e => e);
             
-            // Logique de filtrage
+            // Isolation Logic
             let enemiesToCalculate = allEnemies;
             if (isolatedOpponentIndex !== null && state.enemy[isolatedOpponentIndex]) {
                 enemiesToCalculate = [state.enemy[isolatedOpponentIndex]];
             }
 
-            // Flag pour savoir si on est en mode isolé EXPLICITE
+            // Flag for explicit isolation
             const isExplicitlyIsolated = (isolatedOpponentIndex !== null);
 
             const activeAllies = state.ally.filter(a => a);
@@ -782,9 +912,16 @@
             let neutralCards = [];
 
             allBrawlers.forEach(brawler => {
-                const safeId = brawler.replace(/[\s.]/g, '-');
-                const card = document.getElementById(`card-${safeId}`);
+                // --- OWNED FILTER ---
+                const card = document.getElementById(`card-${brawler.replace(/[\s.]/g, '-')}`);
                 if (!card) return;
+
+                if (state.filterOwned && !state.ownedBrawlers.has(brawler)) {
+                    card.style.display = 'none';
+                    return; 
+                }
+                card.style.display = 'flex'; // Reset display if previously hidden
+                // ---------------------------
                 
                 card.className = 'brawler-card'; 
                 card.classList.remove('expanded');
@@ -834,20 +971,15 @@
                 }
 
                 if (threats === 0) {
-                    // LOGIQUE CORRIGEE:
-                    // Si on est en mode isolé : Perfect = on tue la cible unique
-                    // Si on est en mode global : Perfect = on tue TOUT LE MONDE (3 persos)
-                    // Sinon, si on tue 1 mec sur 1 en mode global, c'est juste "Bien" (Vert)
-                    
                     const isPerfectGlobal = (!isExplicitlyIsolated && victims.length === 3);
                     const isPerfectIsolated = (isExplicitlyIsolated && victims.length === 1);
 
                     if (isPerfectGlobal || isPerfectIsolated) {
                         card.classList.add('status-perfect'); statusPriority = 1; // Cyan
                     } else if (scoreNet >= 2) {
-                        card.classList.add('status-ideal'); statusPriority = 2; // Or
+                        card.classList.add('status-ideal'); statusPriority = 2; // Gold
                     } else if (scoreNet > 0) {
-                        card.classList.add('status-good'); statusPriority = 3; // Vert
+                        card.classList.add('status-good'); statusPriority = 3; // Green
                     } else {
                         if(isRelevant) statusPriority = 5; 
                     }
@@ -894,6 +1026,9 @@
 
             neutralCards.forEach(item => neutralGrid.appendChild(item.card));
             separator.style.display = activeCards.length > 0 ? 'block' : 'none';
+            
+            // Re-apply search filter if needed
+            filterGrid();
         }
 
         function filterGrid() {
@@ -903,6 +1038,9 @@
 
             const cards = document.querySelectorAll('.brawler-card');
             cards.forEach(card => {
+                // If already hidden by roster filter, don't show it
+                if (card.style.display === 'none' && (!state.filterOwned || !state.ownedBrawlers.has(card.dataset.name))) return;
+
                 const name = card.querySelector('.name').innerText.toLowerCase();
                 card.style.display = name.includes(term) ? 'flex' : 'none';
             });
@@ -919,7 +1057,7 @@
             const { type, index } = state.activeSlot;
             if (!type) return;
 
-            // Si on vide le slot isolé, on coupe l'isolation
+            // If clearing isolated slot, remove isolation
             if (type === 'enemy' && index === isolatedOpponentIndex) {
                 isolatedOpponentIndex = null;
             }
@@ -980,6 +1118,8 @@
             }
         });
 
+        // Initialize everything
+        initRoster(); 
         initGrid();
         selectSlot(document.querySelectorAll('.ban-slot')[0], 'ban', 0);
 
