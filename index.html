@@ -112,7 +112,7 @@
         .pick-slot {
             height: 100px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            cursor: pointer; position: relative; overflow: visible; transition: all 0.2s ease; /* Overflow visible pour badges */
+            cursor: pointer; position: relative; overflow: visible; transition: all 0.2s ease; 
         }
         .pick-slot > img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
         .pick-slot span { 
@@ -125,7 +125,45 @@
         .pick-slot.enemy.active { border-color: var(--pick-enemy); box-shadow: 0 0 0 1px var(--pick-enemy); z-index: 5; }
         .pick-slot.ally.active { border-color: var(--pick-ally); box-shadow: 0 0 0 1px var(--pick-ally); z-index: 5; }
 
-        /* --- NOUVEAU: MINI ICONES DANS LES SLOTS --- */
+        /* --- INTEGRATION OEIL DE FOCUS --- */
+        .isolation-eye {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            width: 36px; height: 36px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.3);
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; /* Caché par défaut */
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            cursor: pointer;
+            z-index: 20;
+            color: white;
+            pointer-events: auto;
+        }
+        
+        /* Apparition au survol du slot */
+        .pick-slot:hover .isolation-eye { 
+            opacity: 1; 
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        /* État actif (cliqué) */
+        .isolation-eye.active-eye {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.1);
+            background: var(--col-perfect); /* Cyan */
+            color: #000;
+            border-color: transparent;
+            box-shadow: 0 0 15px rgba(34, 211, 238, 0.6);
+        }
+        
+        .isolation-eye svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+
+        /* --- MINI ICONES --- */
         .slot-interactions {
             position: absolute;
             top: 4px; left: 4px; right: 4px;
@@ -140,8 +178,8 @@
             width: 27px; height: 27px; border-radius: 75%; border: 2px solid white; background: #000;
             box-shadow: 0 2px 4px rgba(0,0,0,0.8); object-fit: cover;
         }
-        .slot-mini-icon.victim { border-color: var(--col-good); } /* Je le bats (Vert) */
-        .slot-mini-icon.killer { border-color: var(--col-bad); }  /* Il me bat (Rouge) */
+        .slot-mini-icon.victim { border-color: var(--col-good); }
+        .slot-mini-icon.killer { border-color: var(--col-bad); } 
 
 
         /* --- GRID CONTAINER --- */
@@ -169,7 +207,6 @@
         }
         .search-clear-btn:hover { color: var(--text-main); }
 
-        /* SCROLLABLE AREA wrapper */
         .scroll-area {
             flex: 1;
             overflow-y: auto;
@@ -186,15 +223,10 @@
             color: var(--text-muted);
             letter-spacing: 1px;
             text-transform: uppercase;
-            display: none; /* Hidden by default */
+            display: none;
         }
 
-        /* NEW SPACER CLASS */
-        .grid-break {
-            grid-column: 1 / -1;
-            height: 24px;
-            width: 100%;
-        }
+        .grid-break { grid-column: 1 / -1; height: 24px; width: 100%; }
 
         .brawlers-grid {
             display: grid; 
@@ -208,19 +240,15 @@
             background: var(--card-bg); border-radius: 10px; cursor: pointer;
             border: 1px solid var(--border-color);
             position: relative; 
-            
-            /* SQUARE MODE (DEFAULT) */
             height: 100px; 
-            
             display: flex; flex-direction: column; align-items: center; 
             justify-content: center;
             padding: 6px;
             transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
         
-        /* RECTANGLE MODE (ACTIVE) - COMPACT */
         .brawler-card.expanded {
-            height: 110px; /* Reduced height for compactness */
+            height: 110px; 
             justify-content: flex-start;
             background: #252e3d;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -256,15 +284,14 @@
         .brawler-card.banned { opacity: 0.5; pointer-events: none; border-color: var(--col-ban); filter: grayscale(100%); }
         .brawler-card.banned::after { content: '✕'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; color: var(--col-ban); font-weight: bold; }
 
-        /* MINI ICONS - HORIZONTAL LAYOUT */
         .interactions-container { 
             width: 100%; 
             display: none; 
-            flex-direction: row; /* Horizontal layout */
-            justify-content: space-between; /* One group on Left, one on Right */
-            align-items: flex-end; /* Bottom align */
+            flex-direction: row; 
+            justify-content: space-between; 
+            align-items: flex-end; 
             margin-top: auto; 
-            padding: 0 4px; /* Slight padding from edges */
+            padding: 0 4px; 
             padding-bottom: 2px; 
             pointer-events: none; 
             flex-shrink: 0;
@@ -273,9 +300,7 @@
         .brawler-card.expanded .interactions-container { display: flex; }
 
         .mini-icon-group { display: flex; gap: 2px; height: 24px; }
-        /* Victims (Left) */
         .group-victims { justify-content: flex-start; }
-        /* Killers (Right) */
         .group-killers { justify-content: flex-end; }
 
         .mini-icon { 
@@ -510,6 +535,9 @@
             firstPick: 'ally'
         };
 
+        // NOUVEAU: Variable d'état pour le mode isolé
+        let isolatedOpponentIndex = null;
+
         // --- DOM ELEMENTS ---
         const activeGrid = document.getElementById('active-grid');
         const neutralGrid = document.getElementById('neutral-grid');
@@ -584,6 +612,28 @@
             }
         }
 
+        // NOUVEAU: Fonction pour activer/désactiver le mode isolé
+        function toggleIsolation(index, event) {
+            if(event) event.stopPropagation();
+            
+            if (isolatedOpponentIndex === index) {
+                isolatedOpponentIndex = null;
+            } else {
+                isolatedOpponentIndex = index;
+            }
+            
+            // Mise à jour visuelle immédiate des yeux
+            for(let i=0; i<3; i++) {
+                const eye = document.getElementById(`eye-${i}`);
+                if(eye) {
+                    if(i === isolatedOpponentIndex) eye.classList.add('active-eye');
+                    else eye.classList.remove('active-eye');
+                }
+            }
+            
+            updateGridState();
+        }
+
         function handleBrawlerClick(brawlerName) {
             if (!state.activeSlot.type) { alert("Select a slot first!"); return; }
             const { type, index } = state.activeSlot;
@@ -646,7 +696,21 @@
             } else {
                 const panelIndex = type === 'enemy' ? 0 : 1;
                 element = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[index];
-                // INSERTION STRUCTURE MINI ICONES
+                
+                // NOUVEAU: Ajout de l'œil si c'est un ennemi
+                let eyeHtml = '';
+                if (type === 'enemy') {
+                    const isActive = (isolatedOpponentIndex === index) ? 'active-eye' : '';
+                    eyeHtml = `
+                        <div id="eye-${index}" class="isolation-eye ${isActive}" onclick="toggleIsolation(${index}, event)">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </div>
+                    `;
+                }
+
                 element.innerHTML = `
                     <img src="icons/${fileName}" onerror="this.src='https://via.placeholder.com/100?text=?'">
                     <span>${name}</span>
@@ -654,25 +718,34 @@
                         <div class="slot-victims"></div>
                         <div class="slot-killers"></div>
                     </div>
+                    ${eyeHtml}
                 `;
             }
         }
 
         function updateGridState() {
-            const activeEnemies = state.enemy.filter(e => e);
-            const activeAllies = state.ally.filter(a => a);
-            // On garde allPicks pour d'autres logiques si besoin
-            const allPicks = [...activeEnemies, ...activeAllies];
+            // FIX: Nettoyage des anciens spacers pour éviter les espaces vides
+            const oldBreaks = activeGrid.querySelectorAll('.grid-break');
+            oldBreaks.forEach(b => b.remove());
 
-            // 1. UPDATE SLOTS DEJA PICK (DYNAMIC ICONS)
+            const allEnemies = state.enemy.filter(e => e);
+            
+            // Logique de filtrage
+            let enemiesToCalculate = allEnemies;
+            if (isolatedOpponentIndex !== null && state.enemy[isolatedOpponentIndex]) {
+                enemiesToCalculate = [state.enemy[isolatedOpponentIndex]];
+            }
+
+            // Flag pour savoir si on est en mode isolé EXPLICITE
+            const isExplicitlyIsolated = (isolatedOpponentIndex !== null);
+
+            const activeAllies = state.ally.filter(a => a);
+
+            // 1. UPDATE SLOTS
             const updatePickSlots = (teamArr, type) => {
                 const panelIndex = (type === 'enemy') ? 0 : 1;
                 const panel = document.querySelectorAll('.team-panel')[panelIndex];
-                
-                // C'est ici que se fait le changement clé :
-                // Si on met à jour les slots ennemis, on ne regarde que les alliés (activeAllies)
-                // Si on met à jour les slots alliés, on ne regarde que les ennemis (activeEnemies)
-                const opposingTeam = (type === 'enemy') ? activeAllies : activeEnemies;
+                const opposingTeam = (type === 'enemy') ? activeAllies : allEnemies;
 
                 teamArr.forEach((brawler, idx) => {
                     if(!brawler) return;
@@ -684,18 +757,13 @@
                     vCont.innerHTML = '';
                     kCont.innerHTML = '';
 
-                    // On itère uniquement sur l'équipe adverse au lieu de 'allPicks'
                     opposingTeam.forEach(other => {
-                        // Pas besoin de vérifier "if (other === brawler)" car les listes sont disjointes
-                        
-                        // Si le brawler actuel (ex: Willow) bat l'autre (ex: Buster adverse) -> icone verte
                         if (getWeaknessesOf(other).includes(brawler)) {
                             const img = document.createElement('img');
                             img.src = "icons/" + getFileName(other);
                             img.className = "slot-mini-icon victim";
                             vCont.appendChild(img);
                         }
-                        // Si le brawler actuel se fait battre par l'autre -> icone rouge
                         if (getWeaknessesOf(brawler).includes(other)) {
                             const img = document.createElement('img');
                             img.src = "icons/" + getFileName(other);
@@ -718,7 +786,6 @@
                 const card = document.getElementById(`card-${safeId}`);
                 if (!card) return;
                 
-                // Reset classes
                 card.className = 'brawler-card'; 
                 card.classList.remove('expanded');
                 
@@ -730,27 +797,24 @@
                 let statusPriority = 999; 
                 let isRelevant = false;
 
-                // Disable
                 if (state.ban.includes(brawler)) {
                     card.classList.add('disabled', 'banned');
                     neutralCards.push({ card, priority: 1000, name: brawler });
                     return;
-                } else if (activeEnemies.includes(brawler) || activeAllies.includes(brawler)) {
+                } else if (allEnemies.includes(brawler) || activeAllies.includes(brawler)) {
                     card.classList.add('disabled');
                     neutralCards.push({ card, priority: 1000, name: brawler });
                     return;
                 }
 
-                // ANALYSE INTERACTIONS
                 let victims = []; 
                 let killers = []; 
 
-                activeEnemies.forEach(enemy => {
+                enemiesToCalculate.forEach(enemy => {
                     if (getWeaknessesOf(enemy).includes(brawler)) { victims.push(enemy); }
                     if (getWeaknessesOf(brawler).includes(enemy)) { killers.push(enemy); }
                 });
 
-                // GENERATE MINI ICONS
                 victims.forEach(vName => {
                     const img = document.createElement('img'); img.src = "icons/" + getFileName(vName);
                     img.className = "mini-icon victim"; victimsContainer.appendChild(img);
@@ -760,9 +824,9 @@
                     img.className = "mini-icon killer"; killersContainer.appendChild(img);
                 });
 
-                // NET SCORE & CLASSIFICATION
                 const scoreNet = victims.length - killers.length;
                 const threats = killers.length;
+                const maxThreats = enemiesToCalculate.length; 
                 
                 if (victims.length > 0 || killers.length > 0) {
                     isRelevant = true;
@@ -770,17 +834,25 @@
                 }
 
                 if (threats === 0) {
-                    if (victims.length === 3) {
-                        card.classList.add('status-perfect'); statusPriority = 1;
+                    // LOGIQUE CORRIGEE:
+                    // Si on est en mode isolé : Perfect = on tue la cible unique
+                    // Si on est en mode global : Perfect = on tue TOUT LE MONDE (3 persos)
+                    // Sinon, si on tue 1 mec sur 1 en mode global, c'est juste "Bien" (Vert)
+                    
+                    const isPerfectGlobal = (!isExplicitlyIsolated && victims.length === 3);
+                    const isPerfectIsolated = (isExplicitlyIsolated && victims.length === 1);
+
+                    if (isPerfectGlobal || isPerfectIsolated) {
+                        card.classList.add('status-perfect'); statusPriority = 1; // Cyan
                     } else if (scoreNet >= 2) {
-                        card.classList.add('status-ideal'); statusPriority = 2;
+                        card.classList.add('status-ideal'); statusPriority = 2; // Or
                     } else if (scoreNet > 0) {
-                        card.classList.add('status-good'); statusPriority = 3;
+                        card.classList.add('status-good'); statusPriority = 3; // Vert
                     } else {
                         if(isRelevant) statusPriority = 5; 
                     }
                 } else {
-                    if (threats === 3) {
+                    if (maxThreats > 0 && threats === maxThreats) {
                         card.classList.add('status-worst'); statusPriority = 8;
                     } else if (scoreNet > 0) {
                         card.classList.add('status-good-risky'); statusPriority = 4;
@@ -800,7 +872,6 @@
                 }
             });
 
-            // SORT AND INSERT
             activeCards.sort((a, b) => {
                 if (a.priority !== b.priority) return a.priority - b.priority;
                 return a.name.localeCompare(b.name);
@@ -808,7 +879,6 @@
 
             neutralCards.sort((a, b) => a.name.localeCompare(b.name));
 
-            // Insertion with break
             let hasInsertedBreak = false;
             activeCards.forEach((item, index) => {
                 if (!hasInsertedBreak && item.priority >= 6) {
@@ -848,6 +918,12 @@
         function clearCurrentSlot() {
             const { type, index } = state.activeSlot;
             if (!type) return;
+
+            // Si on vide le slot isolé, on coupe l'isolation
+            if (type === 'enemy' && index === isolatedOpponentIndex) {
+                isolatedOpponentIndex = null;
+            }
+
             state[type][index] = null;
             clearSlot(type, index);
             updateGridState();
@@ -869,6 +945,9 @@
             state.ban = [null,null,null,null,null,null];
             state.enemy = [null,null,null];
             state.ally = [null,null,null];
+            
+            isolatedOpponentIndex = null;
+
             document.querySelectorAll('.ban-slot').forEach(el => { el.innerHTML = ''; el.classList.remove('banned'); });
             document.querySelectorAll('.pick-slot').forEach((el, i) => {
                 const idx = Array.from(el.parentNode.children).indexOf(el) - 1; 
