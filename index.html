@@ -112,17 +112,37 @@
         .pick-slot {
             height: 100px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            cursor: pointer; position: relative; overflow: hidden; transition: all 0.2s ease;
+            cursor: pointer; position: relative; overflow: visible; transition: all 0.2s ease; /* Overflow visible pour badges */
         }
-        .pick-slot img { width: 100%; height: 100%; object-fit: cover; }
+        .pick-slot > img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
         .pick-slot span { 
             position: absolute; bottom: 6px; font-size: 11px; font-weight: 500;
             color: var(--text-muted); pointer-events: none; 
             background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 12px; backdrop-filter: blur(4px);
+            z-index: 2;
         }
         .pick-slot:hover { border-color: var(--text-muted); }
-        .pick-slot.enemy.active { border-color: var(--pick-enemy); box-shadow: 0 0 0 1px var(--pick-enemy); }
-        .pick-slot.ally.active { border-color: var(--pick-ally); box-shadow: 0 0 0 1px var(--pick-ally); }
+        .pick-slot.enemy.active { border-color: var(--pick-enemy); box-shadow: 0 0 0 1px var(--pick-enemy); z-index: 5; }
+        .pick-slot.ally.active { border-color: var(--pick-ally); box-shadow: 0 0 0 1px var(--pick-ally); z-index: 5; }
+
+        /* --- NOUVEAU: MINI ICONES DANS LES SLOTS --- */
+        .slot-interactions {
+            position: absolute;
+            top: 4px; left: 4px; right: 4px;
+            display: flex; justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .slot-victims { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+        .slot-killers { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+
+        .slot-mini-icon {
+            width: 27px; height: 27px; border-radius: 50%; border: 1px solid white; background: #000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.8); object-fit: cover;
+        }
+        .slot-mini-icon.victim { border-color: var(--col-good); } /* Je le bats (Vert) */
+        .slot-mini-icon.killer { border-color: var(--col-bad); }  /* Il me bat (Rouge) */
+
 
         /* --- GRID CONTAINER --- */
         .grid-container {
@@ -533,10 +553,7 @@
         }
 
         function toggleFirstPick() {
-            // 1. Toggle State
             state.firstPick = (state.firstPick === 'ally') ? 'enemy' : 'ally';
-
-            // 2. Update Button UI
             const btn = document.getElementById('btn-fp');
             if (state.firstPick === 'ally') {
                 btn.className = 'fp-ally';
@@ -546,35 +563,22 @@
                 btn.innerText = '1ˢᵗ pick : Them';
             }
 
-            // 3. LOGIC FIX: Re-calculate Active Slot if we are in Pick Phase
             if (state.activeSlot.type !== 'ban') {
-                // Count current picks
                 const filledAlly = state.ally.filter(x => x !== null).length;
                 const filledEnemy = state.enemy.filter(x => x !== null).length;
                 const totalPicks = filledAlly + filledEnemy;
 
                 if (totalPicks < 6) {
-                    // Determine sequence based on NEW first pick
                     const A = state.firstPick;
                     const B = (A === 'ally') ? 'enemy' : 'ally';
-
-                    // Standard Draft Sequence: A, B, B, A, A, B
                     const sequence = [
-                        { type: A, index: 0 },
-                        { type: B, index: 0 },
-                        { type: B, index: 1 },
-                        { type: A, index: 1 },
-                        { type: A, index: 2 },
-                        { type: B, index: 2 }
+                        { type: A, index: 0 }, { type: B, index: 0 }, { type: B, index: 1 }, 
+                        { type: A, index: 1 }, { type: A, index: 2 }, { type: B, index: 2 }
                     ];
-
                     const nextStep = sequence[totalPicks];
-                    
-                    // Force select the correct slot
                     const panelIndex = (nextStep.type === 'enemy') ? 0 : 1;
                     const slotToSelect = document.querySelectorAll('.team-panel')[panelIndex]
-                                                .querySelectorAll('.pick-slot')[nextStep.index];
-                    
+                                                    .querySelectorAll('.pick-slot')[nextStep.index];
                     selectSlot(slotToSelect, nextStep.type, nextStep.index);
                 }
             }
@@ -642,15 +646,64 @@
             } else {
                 const panelIndex = type === 'enemy' ? 0 : 1;
                 element = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[index];
-                element.innerHTML = `<img src="icons/${fileName}" onerror="this.src='https://via.placeholder.com/100?text=?'"><span>${name}</span>`;
+                // INSERTION STRUCTURE MINI ICONES
+                element.innerHTML = `
+                    <img src="icons/${fileName}" onerror="this.src='https://via.placeholder.com/100?text=?'">
+                    <span>${name}</span>
+                    <div class="slot-interactions">
+                        <div class="slot-victims"></div>
+                        <div class="slot-killers"></div>
+                    </div>
+                `;
             }
         }
 
         function updateGridState() {
             const activeEnemies = state.enemy.filter(e => e);
             const activeAllies = state.ally.filter(a => a);
+            const allPicks = [...activeEnemies, ...activeAllies];
 
-            // Sorting arrays
+            // 1. UPDATE SLOTS DEJA PICK (DYNAMIC ICONS)
+            const updatePickSlots = (teamArr, type) => {
+                const panelIndex = (type === 'enemy') ? 0 : 1;
+                const panel = document.querySelectorAll('.team-panel')[panelIndex];
+                
+                teamArr.forEach((brawler, idx) => {
+                    if(!brawler) return;
+                    const slot = panel.querySelectorAll('.pick-slot')[idx];
+                    const vCont = slot.querySelector('.slot-victims');
+                    const kCont = slot.querySelector('.slot-killers');
+                    if(!vCont) return;
+
+                    vCont.innerHTML = '';
+                    kCont.innerHTML = '';
+
+                    // Check vs all other active picks
+                    allPicks.forEach(other => {
+                        if (other === brawler) return;
+                        
+                        // Si je le bats
+                        if (getWeaknessesOf(other).includes(brawler)) {
+                            const img = document.createElement('img');
+                            img.src = "icons/" + getFileName(other);
+                            img.className = "slot-mini-icon victim";
+                            vCont.appendChild(img);
+                        }
+                        // Si il me bat
+                        if (getWeaknessesOf(brawler).includes(other)) {
+                            const img = document.createElement('img');
+                            img.src = "icons/" + getFileName(other);
+                            img.className = "slot-mini-icon killer";
+                            kCont.appendChild(img);
+                        }
+                    });
+                });
+            };
+            updatePickSlots(state.enemy, 'enemy');
+            updatePickSlots(state.ally, 'ally');
+
+
+            // 2. UPDATE GRID SUGGESTIONS
             let activeCards = [];
             let neutralCards = [];
 
@@ -671,7 +724,7 @@
                 let statusPriority = 999; 
                 let isRelevant = false;
 
-                // 1. Disable
+                // Disable
                 if (state.ban.includes(brawler)) {
                     card.classList.add('disabled', 'banned');
                     neutralCards.push({ card, priority: 1000, name: brawler });
@@ -682,7 +735,7 @@
                     return;
                 }
 
-                // 2. ANALYZE INTERACTIONS
+                // ANALYSE INTERACTIONS
                 let victims = []; 
                 let killers = []; 
 
@@ -691,7 +744,7 @@
                     if (getWeaknessesOf(brawler).includes(enemy)) { killers.push(enemy); }
                 });
 
-                // 3. GENERATE MINI ICONS
+                // GENERATE MINI ICONS
                 victims.forEach(vName => {
                     const img = document.createElement('img'); img.src = "icons/" + getFileName(vName);
                     img.className = "mini-icon victim"; victimsContainer.appendChild(img);
@@ -701,7 +754,7 @@
                     img.className = "mini-icon killer"; killersContainer.appendChild(img);
                 });
 
-                // 4. NET SCORE & CLASSIFICATION
+                // NET SCORE & CLASSIFICATION
                 const scoreNet = victims.length - killers.length;
                 const threats = killers.length;
                 
@@ -710,7 +763,6 @@
                     card.classList.add('expanded');
                 }
 
-                // Determine Status and Priority
                 if (threats === 0) {
                     if (victims.length === 3) {
                         card.classList.add('status-perfect'); statusPriority = 1;
@@ -750,14 +802,10 @@
 
             neutralCards.sort((a, b) => a.name.localeCompare(b.name));
 
-            // Insertion with break between Good/Mixed (< 6) and Bad (>= 6)
+            // Insertion with break
             let hasInsertedBreak = false;
-            
-            // Clear current children effectively by moving them
             activeCards.forEach((item, index) => {
-                // If we transition from Good/Mixed/Risky (priority 1-5) to Bad (priority 6-8)
                 if (!hasInsertedBreak && item.priority >= 6) {
-                    // Check if there were previous items to separate from
                     if (index > 0) {
                          const breakDiv = document.createElement('div');
                          breakDiv.className = 'grid-break';
@@ -769,7 +817,6 @@
             });
 
             neutralCards.forEach(item => neutralGrid.appendChild(item.card));
-
             separator.style.display = activeCards.length > 0 ? 'block' : 'none';
         }
 
@@ -831,40 +878,20 @@
             setTimeout(() => { selectSlot(document.querySelectorAll('.ban-slot')[0], 'ban', 0); }, 50);
         }
 
-        // Global keydown for fast search
         document.addEventListener('keydown', function(e) {
             const searchInput = document.getElementById('searchInput');
-            
-            // If the user is typing in the search bar, don't interfere (except maybe Esc)
             if (document.activeElement === searchInput) {
-                if (e.key === 'Escape') {
-                    searchInput.blur();
-                }
+                if (e.key === 'Escape') searchInput.blur();
                 return;
             }
-
-            // Case 1: Backspace -> Clear everything + Focus + Reset Grid
             if (e.key === 'Backspace') {
-                searchInput.value = '';
-                searchInput.focus();
-                filterGrid(); // Updates grid to show all
-                return;
+                searchInput.value = ''; searchInput.focus(); filterGrid(); return;
             }
-
-            // Case 2: Printable Character -> Clear previous search + Focus + Allow typing
-            // Detect if key is a printable character (length 1) and not a modifier combo
             if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                searchInput.value = '';
-                searchInput.focus();
-                // The keypress event will naturally populate the input since we focused it
-                // in the keydown phase (usually works).
+                searchInput.value = ''; searchInput.focus();
             }
-            // Keep Ctrl+F as fallback/habit
             else if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
-                e.preventDefault(); 
-                searchInput.value = '';
-                searchInput.focus();
-                filterGrid(); 
+                e.preventDefault(); searchInput.value = ''; searchInput.focus(); filterGrid(); 
             }
         });
 
