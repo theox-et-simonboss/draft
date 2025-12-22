@@ -661,6 +661,7 @@
         function updateGridState() {
             const activeEnemies = state.enemy.filter(e => e);
             const activeAllies = state.ally.filter(a => a);
+            // On garde allPicks pour d'autres logiques si besoin
             const allPicks = [...activeEnemies, ...activeAllies];
 
             // 1. UPDATE SLOTS DEJA PICK (DYNAMIC ICONS)
@@ -668,6 +669,11 @@
                 const panelIndex = (type === 'enemy') ? 0 : 1;
                 const panel = document.querySelectorAll('.team-panel')[panelIndex];
                 
+                // C'est ici que se fait le changement clé :
+                // Si on met à jour les slots ennemis, on ne regarde que les alliés (activeAllies)
+                // Si on met à jour les slots alliés, on ne regarde que les ennemis (activeEnemies)
+                const opposingTeam = (type === 'enemy') ? activeAllies : activeEnemies;
+
                 teamArr.forEach((brawler, idx) => {
                     if(!brawler) return;
                     const slot = panel.querySelectorAll('.pick-slot')[idx];
@@ -678,18 +684,18 @@
                     vCont.innerHTML = '';
                     kCont.innerHTML = '';
 
-                    // Check vs all other active picks
-                    allPicks.forEach(other => {
-                        if (other === brawler) return;
+                    // On itère uniquement sur l'équipe adverse au lieu de 'allPicks'
+                    opposingTeam.forEach(other => {
+                        // Pas besoin de vérifier "if (other === brawler)" car les listes sont disjointes
                         
-                        // Si je le bats
+                        // Si le brawler actuel (ex: Willow) bat l'autre (ex: Buster adverse) -> icone verte
                         if (getWeaknessesOf(other).includes(brawler)) {
                             const img = document.createElement('img');
                             img.src = "icons/" + getFileName(other);
                             img.className = "slot-mini-icon victim";
                             vCont.appendChild(img);
                         }
-                        // Si il me bat
+                        // Si le brawler actuel se fait battre par l'autre -> icone rouge
                         if (getWeaknessesOf(brawler).includes(other)) {
                             const img = document.createElement('img');
                             img.src = "icons/" + getFileName(other);
@@ -699,9 +705,9 @@
                     });
                 });
             };
+            
             updatePickSlots(state.enemy, 'enemy');
             updatePickSlots(state.ally, 'ally');
-
 
             // 2. UPDATE GRID SUGGESTIONS
             let activeCards = [];
@@ -901,4 +907,3 @@
     </script>
 </body>
 </html>
-
