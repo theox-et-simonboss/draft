@@ -916,12 +916,8 @@
                 const card = document.getElementById(`card-${brawler.replace(/[\s.]/g, '-')}`);
                 if (!card) return;
 
-                if (state.filterOwned && !state.ownedBrawlers.has(brawler)) {
-                    card.style.display = 'none';
-                    return; 
-                }
-                card.style.display = 'flex'; // Reset display if previously hidden
-                // ---------------------------
+                // Important : on n'applique pas le filtre ici directement, 
+                // on laisse filterGrid() gérer l'affichage final pour éviter les conflits
                 
                 card.className = 'brawler-card'; 
                 card.classList.remove('expanded');
@@ -1032,17 +1028,22 @@
         }
 
         function filterGrid() {
-            const term = document.getElementById('searchInput').value.toLowerCase();
+            const term = document.getElementById('searchInput').value.toLowerCase().trim();
             const clearBtn = document.getElementById('searchClear');
             clearBtn.style.display = term.length > 0 ? 'block' : 'none';
 
             const cards = document.querySelectorAll('.brawler-card');
+            
             cards.forEach(card => {
-                // If already hidden by roster filter, don't show it
-                if (card.style.display === 'none' && (!state.filterOwned || !state.ownedBrawlers.has(card.dataset.name))) return;
+                const name = card.dataset.name.toLowerCase();
+                const matchesSearch = name.includes(term);
+                const matchesRoster = !state.filterOwned || state.ownedBrawlers.has(card.dataset.name);
 
-                const name = card.querySelector('.name').innerText.toLowerCase();
-                card.style.display = name.includes(term) ? 'flex' : 'none';
+                if (matchesSearch && matchesRoster) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
             });
         }
 
@@ -1103,10 +1104,37 @@
 
         document.addEventListener('keydown', function(e) {
             const searchInput = document.getElementById('searchInput');
+            
+            // Si le focus est dans la barre de recherche
             if (document.activeElement === searchInput) {
-                if (e.key === 'Escape') searchInput.blur();
+                if (e.key === 'Escape') {
+                    searchInput.blur();
+                    return;
+                }
+                
+                // GESTION DE LA TOUCHE ENTREE
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // On cherche la première carte visible
+                    const cards = document.querySelectorAll('.brawler-card');
+                    for (const card of cards) {
+                        // On vérifie si la carte est visible (flex) et non masquée (none)
+                        if (card.style.display !== 'none') {
+                            card.click(); // Simule le clic
+                            
+                            // NOUVEAU : Réinitialisation immédiate pour enchaîner
+                            searchInput.value = ''; 
+                            filterGrid();
+                            
+                            break; // On ne clique que sur le premier et on arrête
+                        }
+                    }
+                    return;
+                }
+                
                 return;
             }
+
             if (e.key === 'Backspace') {
                 searchInput.value = ''; searchInput.focus(); filterGrid(); return;
             }
