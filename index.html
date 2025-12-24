@@ -710,8 +710,8 @@
             if(element) element.classList.add('active');
         }
 
-        function toggleFirstPick() {
-            state.firstPick = (state.firstPick === 'ally') ? 'enemy' : 'ally';
+        function setFirstPick(team) {
+            state.firstPick = team;
             const btn = document.getElementById('btn-fp');
             if (state.firstPick === 'ally') {
                 btn.className = 'fp-ally';
@@ -721,6 +721,7 @@
                 btn.innerText = '1ˢᵗ pick : Them';
             }
 
+            // Recalculate active slot only if we are in pick phase (not bans)
             if (state.activeSlot.type !== 'ban') {
                 const filledAlly = state.ally.filter(x => x !== null).length;
                 const filledEnemy = state.enemy.filter(x => x !== null).length;
@@ -740,6 +741,10 @@
                     selectSlot(slotToSelect, nextStep.type, nextStep.index);
                 }
             }
+        }
+
+        function toggleFirstPick() {
+            setFirstPick(state.firstPick === 'ally' ? 'enemy' : 'ally');
         }
 
         // ISOLATION TOGGLE
@@ -783,6 +788,7 @@
                 if (currentIndex < 5) {
                     selectSlot(document.querySelectorAll('.ban-slot')[currentIndex + 1], 'ban', currentIndex + 1);
                 } else {
+                    // Fin des bans, on passe au premier pick selon le First Pick défini
                     const fpTeam = state.firstPick;
                     const panelIndex = (fpTeam === 'enemy') ? 0 : 1;
                     selectSlot(document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[0], fpTeam, 0);
@@ -1105,6 +1111,105 @@
         document.addEventListener('keydown', function(e) {
             const searchInput = document.getElementById('searchInput');
             
+            // GESTION FIRST PICK AVEC FLÈCHE DROITE (Remplacement)
+            if (e.key === 'ArrowRight') {
+                toggleFirstPick();
+                return;
+            }
+
+            // GESTION CTRL + Z (UNDO)
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+                e.preventDefault();
+
+                // 1. Reconstruire la séquence chronologique
+                let sequence = [];
+                // Ajout des bans
+                for (let i = 0; i < 6; i++) sequence.push({ type: 'ban', index: i });
+                
+                // Ajout des picks selon l'ordre
+                const A = state.firstPick;
+                const B = (A === 'ally') ? 'enemy' : 'ally';
+                const pickOrder = [
+                    { type: A, index: 0 }, { type: B, index: 0 }, { type: B, index: 1 }, 
+                    { type: A, index: 1 }, { type: A, index: 2 }, { type: B, index: 2 }
+                ];
+                sequence = [...sequence, ...pickOrder];
+
+                // 2. Trouver où on est actuellement
+                let currentPos = -1;
+                for(let i=0; i<sequence.length; i++) {
+                    if(sequence[i].type === state.activeSlot.type && sequence[i].index === state.activeSlot.index) {
+                        currentPos = i;
+                        break;
+                    }
+                }
+
+                // 3. Revenir en arrière d'un cran
+                if (currentPos > 0) {
+                    const prevStep = sequence[currentPos - 1];
+                    
+                    // Nettoyer les données de l'étape précédente
+                    state[prevStep.type][prevStep.index] = null;
+                    
+                    // Nettoyer l'affichage
+                    clearSlot(prevStep.type, prevStep.index);
+
+                    // Sélectionner l'étape précédente
+                    const panelIndex = (prevStep.type === 'enemy') ? 0 : 1;
+                    let el;
+                    if(prevStep.type === 'ban') {
+                        el = document.querySelectorAll('.ban-slot')[prevStep.index];
+                    } else {
+                        el = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[prevStep.index];
+                    }
+                    
+                    selectSlot(el, prevStep.type, prevStep.index);
+                    updateGridState();
+                }
+                return;
+            }
+
+            // GESTION TABULATION (Navigation Bans <-> Picks)
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                
+                // CAS 1 : On est dans les BANS -> On veut aller au prochain PICK vide
+                if (state.activeSlot.type === 'ban') {
+                    const A = state.firstPick;
+                    const B = (A === 'ally') ? 'enemy' : 'ally';
+                    // Ordre chronologique de la draft
+                    const sequence = [
+                        { type: A, index: 0 }, { type: B, index: 0 }, { type: B, index: 1 }, 
+                        { type: A, index: 1 }, { type: A, index: 2 }, { type: B, index: 2 }
+                    ];
+
+                    // On cherche le premier slot vide
+                    for (let step of sequence) {
+                        if (state[step.type][step.index] === null) {
+                            const panelIndex = (step.type === 'enemy') ? 0 : 1;
+                            const slot = document.querySelectorAll('.team-panel')[panelIndex].querySelectorAll('.pick-slot')[step.index];
+                            selectSlot(slot, step.type, step.index);
+                            return;
+                        }
+                    }
+                }
+                // CAS 2 : On est dans les PICKS -> On veut retourner au premier BAN vide
+                else {
+                    for (let i = 0; i < 6; i++) {
+                        if (state.ban[i] === null) {
+                            const slot = document.querySelectorAll('.ban-slot')[i];
+                            selectSlot(slot, 'ban', i);
+                            return;
+                        }
+                    }
+                    // Si tous les bans sont pleins, on retourne au premier ban quand même
+                    if (state.ban.every(b => b !== null)) {
+                         selectSlot(document.querySelectorAll('.ban-slot')[0], 'ban', 0);
+                    }
+                }
+                return;
+            }
+
             // Si le focus est dans la barre de recherche
             if (document.activeElement === searchInput) {
                 if (e.key === 'Escape') {
@@ -1115,23 +1220,17 @@
                 // GESTION DE LA TOUCHE ENTREE
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    // On cherche la première carte visible
                     const cards = document.querySelectorAll('.brawler-card');
                     for (const card of cards) {
-                        // On vérifie si la carte est visible (flex) et non masquée (none)
                         if (card.style.display !== 'none') {
-                            card.click(); // Simule le clic
-                            
-                            // NOUVEAU : Réinitialisation immédiate pour enchaîner
+                            card.click(); 
                             searchInput.value = ''; 
                             filterGrid();
-                            
-                            break; // On ne clique que sur le premier et on arrête
+                            break; 
                         }
                     }
                     return;
                 }
-                
                 return;
             }
 
